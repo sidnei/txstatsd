@@ -1,7 +1,7 @@
 from twisted.application.internet import TCPClient, UDPServer
 from twisted.application.service import Application
 
-from txstatsd.server import MessageProcessor
+from txstatsd.processor import MessageProcessor
 from txstatsd.protocol import GraphiteClientFactory, StatsDProtocol
 
 
