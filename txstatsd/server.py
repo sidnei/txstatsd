@@ -3,7 +3,6 @@ import time
 import logging
 
 from twisted.python import log
-from twisted.internet.protocol import DatagramProtocol
 
 
 SPACES = re.compile("\s+")
@@ -138,14 +137,3 @@ class MessageProcessor(object):
 
         messages.append("statsd.numStats %s %s" % (num_stats, timestamp))
         return messages
-
-
-class StatsD(DatagramProtocol):
-    """A Twisted-based implementation of the StatsD server.
-
-    Data is received via UDP for local aggregation and then sent to a graphite
-    server via TCP.
-    """
-
-    def datagramReceived(self, data, (host, port)):
-        """Process received data and store it locally."""
