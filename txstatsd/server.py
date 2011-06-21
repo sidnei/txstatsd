@@ -1,4 +1,5 @@
 import re
+import time
 import logging
 
 from twisted.python import log
@@ -9,6 +10,15 @@ SPACES = re.compile("\s+")
 SLASHES = re.compile("\/+")
 NON_ALNUM = re.compile("[^a-zA-Z_\-0-9\.]")
 RATE = re.compile("^@([\d\.]+)")
+COUNTERS_MESSAGE = (
+    "stats.%(key)s %(value)s %(timestamp)s\n"
+    "stats_counts.%(key)s %(count)s %(timestamp)s\n")
+TIMERS_MESSAGE = (
+    "stats.timers.%(key)s.mean %(mean)s %(timestamp)s\n"
+    "stats.timers.%(key)s.upper %(upper)s %(timestamp)s\n"
+    "stats.timers.%(key)s.upper_%(percent)s %(threshold_upper)s %(timestamp)s\n"
+    "stats.timers.%(key)s.lower %(lower)s %(timestamp)s\n"
+    "stats.timers.%(key)s.count %(count)s %(timestamp)s\n")
 
 
 def normalize_key(key):
@@ -24,7 +34,8 @@ def normalize_key(key):
 
 class MessageProcessor(object):
 
-    def __init__(self):
+    def __init__(self, time_function=time.time):
+        self.time_function = time_function
         self.timers = {}
         self.counters = {}
 
@@ -71,6 +82,62 @@ class MessageProcessor(object):
             self.timers[key].append(value)
         else:
             return self.fail(message)
+
+    def flush(self, interval=10000, percent=90):
+        """
+        Flush all queued stats, computing a normalized count based on
+        C{interval} and mean timings based on C{threshold}.
+        """
+        messages = []
+        num_stats = 0
+        interval = interval / 1000
+        timestamp = int(self.time_function())
+
+        for key, count in self.counters.iteritems():
+            self.counters[key] = 0
+
+            value = count / interval
+            messages.append(COUNTERS_MESSAGE % {
+                "key": key,
+                "value": value,
+                "count": count,
+                "timestamp": timestamp})
+            num_stats += 1
+
+        threshold_value = ((100 - percent) / 100.0)
+        for key, timers in self.timers.iteritems():
+            count = len(timers)
+            if count > 0:
+                self.timers[key] = []
+
+                timers.sort()
+                lower = timers[0]
+                upper = timers[-1]
+                count = len(timers)
+
+                mean = lower
+                threshold_upper = upper
+
+                if count > 1:
+                    index = count - int(round(threshold_value * count))
+                    timers = timers[:index]
+                    threshold_upper = timers[-1]
+                    mean = sum(timers) / index
+
+                num_stats += 1
+
+                messages.append(TIMERS_MESSAGE % {
+                    "key": key,
+                    "mean": mean,
+                    "upper": upper,
+                    "percent": percent,
+                    "threshold_upper": threshold_upper,
+                    "lower": lower,
+                    "count": count,
+                    "timestamp": timestamp})
+
+        messages.append("statsd.numStats %s %s" % (num_stats, timestamp))
+        return messages
 
 
 class StatsD(DatagramProtocol):

@@ -13,7 +13,7 @@ class TestMessageProcessor(MessageProcessor):
         self.failures.append(message)
 
 
-class MessageProcessorTest(TestCase):
+class ProcessMessagesTest(TestCase):
 
     def setUp(self):
         self.processor = TestMessageProcessor()
@@ -87,7 +87,111 @@ class MessageProcessorTest(TestCase):
         """
         If a timer message has too many fields, it is logged and discarded.
         """
-        self.processor.process("glork:1|c|@0.1|yay")
+        self.processor.process("gorets:1|c|@0.1|yay")
         self.assertEqual(0, len(self.processor.timers))
         self.assertEqual(0, len(self.processor.counters))
-        self.assertEqual(["glork:1|c|@0.1|yay"], self.processor.failures)
+        self.assertEqual(["gorets:1|c|@0.1|yay"], self.processor.failures)
+
+
+class FlushMessagesTest(TestCase):
+
+    def setUp(self):
+        self.processor = MessageProcessor(time_function=lambda: 42)
+
+    def test_flush_no_stats(self):
+        """
+        Flushing the message processor when there are no stats available should
+        still produce one message where C{statsd.numStats} is set to zero.
+        """
+        self.assertEqual(["statsd.numStats 0 42"], self.processor.flush())
+
+    def test_flush_counter(self):
+        """
+        If a counter is present, flushing it will generate a counter message
+        normalized to the default interval.
+        """
+        self.processor.counters["gorets"] = 42
+        messages = self.processor.flush()
+        self.assertEqual(2, len(messages))
+        counters = messages[0].splitlines()
+        self.assertEqual("stats.gorets 4 42", counters[0])
+        self.assertEqual("stats_counts.gorets 42 42", counters[1])
+        self.assertEqual("statsd.numStats 1 42", messages[1])
+        self.assertEqual(0, self.processor.counters["gorets"])
+
+    def test_flush_counter_one_second_interval(self):
+        """
+        It is possible to flush counters with a one-second interval, in which
+        case the counter value will be unchanged.
+        """
+        self.processor.counters["gorets"] = 42
+        messages = self.processor.flush(interval=1000)
+        self.assertEqual(2, len(messages))
+        counters = messages[0].splitlines()
+        self.assertEqual("stats.gorets 42 42", counters[0])
+        self.assertEqual("stats_counts.gorets 42 42", counters[1])
+        self.assertEqual("statsd.numStats 1 42", messages[1])
+        self.assertEqual(0, self.processor.counters["gorets"])
+
+    def test_flush_single_timer_single_time(self):
+        """
+        If a single timer with a single data point is present, all of upper,
+        threshold_upper, lower, mean will be set to the same value. Timer is
+        reset after flush is called.
+        """
+        self.processor.timers["glork"] = [24]
+        messages = self.processor.flush()
+        self.assertEqual(2, len(messages))
+        timers = messages[0].splitlines()
+        self.assertEqual("stats.timers.glork.mean 24 42", timers[0])
+        self.assertEqual("stats.timers.glork.upper 24 42", timers[1])
+        self.assertEqual("stats.timers.glork.upper_90 24 42", timers[2])
+        self.assertEqual("stats.timers.glork.lower 24 42", timers[3])
+        self.assertEqual("stats.timers.glork.count 1 42", timers[4])
+        self.assertEqual("statsd.numStats 1 42", messages[1])
+        self.assertEqual([], self.processor.timers["glork"])
+
+    def test_flush_single_timer_multiple_times(self):
+        """
+        If a single timer with multiple data points is present:
+        - lower will be set to the smallest value
+        - upper will be set to the largest value
+        - upper_90 will be set to the 90th percentile
+        - count will be the count of data points
+        - mean will be the mean value within the 90th percentile
+        """
+        self.processor.timers["glork"] = [4, 8, 15, 16, 23, 42]
+        messages = self.processor.flush()
+        self.assertEqual(2, len(messages))
+        timers = messages[0].splitlines()
+        self.assertEqual("stats.timers.glork.mean 13 42", timers[0])
+        self.assertEqual("stats.timers.glork.upper 42 42", timers[1])
+        self.assertEqual("stats.timers.glork.upper_90 23 42", timers[2])
+        self.assertEqual("stats.timers.glork.lower 4 42", timers[3])
+        self.assertEqual("stats.timers.glork.count 6 42", timers[4])
+        self.assertEqual("statsd.numStats 1 42", messages[1])
+        self.assertEqual([], self.processor.timers["glork"])
+
+    def test_flush_single_timer_50th_percentile(self):
+        """
+        It is possible to flush the timers with a different percentile, in this
+        example, 50%.
+
+        If a single timer with multiple data points is present:
+        - lower will be set to the smallest value
+        - upper will be set to the largest value
+        - upper_50 will be set to the 50th percentile
+        - count will be the count of data points
+        - mean will be the mean value within the 50th percentile
+        """
+        self.processor.timers["glork"] = [4, 8, 15, 16, 23, 42]
+        messages = self.processor.flush(percent=50)
+        self.assertEqual(2, len(messages))
+        timers = messages[0].splitlines()
+        self.assertEqual("stats.timers.glork.mean 9 42", timers[0])
+        self.assertEqual("stats.timers.glork.upper 42 42", timers[1])
+        self.assertEqual("stats.timers.glork.upper_50 15 42", timers[2])
+        self.assertEqual("stats.timers.glork.lower 4 42", timers[3])
+        self.assertEqual("stats.timers.glork.count 6 42", timers[4])
+        self.assertEqual("statsd.numStats 1 42", messages[1])
+        self.assertEqual([], self.processor.timers["glork"])
