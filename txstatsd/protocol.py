@@ -7,10 +7,10 @@ from twisted.internet.protocol import (
     DatagramProtocol, ReconnectingClientFactory)
 
 
-class StatsDProtocol(DatagramProtocol):
+class StatsDServerProtocol(DatagramProtocol):
     """A Twisted-based implementation of the StatsD server.
 
-    Data is received via UDP for local aggregation and then sent to a graphite
+    Data is received via UDP for local aggregation and then sent to a Graphite
     server via TCP.
     """
 
@@ -22,6 +22,23 @@ class StatsDProtocol(DatagramProtocol):
         log.msg("Received data from %s:%d" % (host, port),
                 logLevel=logging.DEBUG)
         self.processor.process(data)
+
+
+class StatsDClientProtocol(DatagramProtocol):
+    """A Twisted-based implementation of the StatsD client protocol.
+
+    Data is sent via ConnectedUDP to a StatsD server for aggregation.
+    """
+
+    def __init__(self, host, port, meter):
+        self.host = host
+        self.port = port
+        self.meter = meter
+
+    def startProtocol(self):
+        """Connect to destination host."""
+        self.transport.connect(self.host, self.port)
+        self.meter.connected(self.transport)
 
 
 class GraphiteProtocol(LineOnlyReceiver):

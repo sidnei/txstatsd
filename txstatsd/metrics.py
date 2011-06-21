@@ -112,3 +112,16 @@ class Measure(object):
         else:
             self.meter.increment(self.operation_name + '.error')
         self.meter.decrement(self.operation_name)
+
+
+class TransportMeter(BaseMeter):
+
+    transport = None
+
+    def connected(self, transport):
+        self.transport = transport
+
+    def write(self, data):
+        """Send metrics to the StatsD server using the transport."""
+        if self.transport is not None:
+            self.transport.write(data)

@@ -59,7 +59,7 @@ class MessageProcessor(object):
             return self.fail(message)
 
         try:
-            value = int(fields[0])
+            value = float(fields[0])
         except (TypeError, ValueError):
             return self.fail(message)
 
