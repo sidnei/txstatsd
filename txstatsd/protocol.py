@@ -1,7 +1,6 @@
 import logging
 
 from twisted.python import log
-from twisted.internet import reactor
 from twisted.internet import task
 from twisted.protocols.basic import LineOnlyReceiver
 from twisted.internet.protocol import (
