@@ -37,8 +37,11 @@ class StatsDClientProtocol(DatagramProtocol):
 
     def startProtocol(self):
         """Connect to destination host."""
-        self.transport.connect(self.host, self.port)
-        self.meter.connected(self.transport)
+        self.meter.connected(self.transport, self.host, self.port)
+
+    def stopProtocol(self):
+        """Connection was lost."""
+        self.meter.disconnected()
 
 
 class GraphiteProtocol(LineOnlyReceiver):

@@ -117,11 +117,18 @@ class Measure(object):
 class TransportMeter(BaseMeter):
 
     transport = None
+    host = None
+    port = None
 
-    def connected(self, transport):
+    def connected(self, transport, host, port):
         self.transport = transport
+        self.host = host
+        self.port = port
+
+    def disconnected(self):
+        self.transport = self.host = self.port = None
 
     def write(self, data):
         """Send metrics to the StatsD server using the transport."""
         if self.transport is not None:
-            self.transport.write(data)
+            self.transport.write(data, (self.host, self.port))
