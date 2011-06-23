@@ -4,7 +4,6 @@ import random
 from twisted.internet import reactor
 from twisted.internet import task
 
-from twisted.application.internet import UDPClient
 from twisted.application.service import Application
 
 from txstatsd.protocol import StatsDClientProtocol
@@ -36,5 +35,5 @@ for n in range(5):
     t.start(0.5, now=False)
 
 
-factory = StatsDClientProtocol("127.0.0.1", 8125, meter)
-reactor.listenUDP(0, factory)
+protocol = StatsDClientProtocol("127.0.0.1", 8125, meter)
+reactor.listenUDP(0, protocol)

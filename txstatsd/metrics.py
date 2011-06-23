@@ -86,8 +86,6 @@ class Meter(BaseMeter):
 class Measure(object):
     """Context Manager for generic measuring."""
 
-    meter_factory = Meter
-
     def __init__(self, prefix, operation_name, meter=None):
         if meter is None:
             meter = Meter(prefix)
