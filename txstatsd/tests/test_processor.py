@@ -1,6 +1,6 @@
 from unittest import TestCase
 
-from txstatsd.server import MessageProcessor
+from txstatsd.processor import MessageProcessor
 
 
 class TestMessageProcessor(MessageProcessor):
