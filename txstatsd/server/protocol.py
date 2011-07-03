@@ -19,27 +19,6 @@ class StatsDServerProtocol(DatagramProtocol):
         self.processor.process(data)
 
 
-class StatsDClientProtocol(DatagramProtocol):
-    """A Twisted-based implementation of the StatsD client protocol.
-
-    Data is sent via UDP to a StatsD server for aggregation.
-    """
-
-    def __init__(self, host, port, meter, interval=None):
-        self.host = host
-        self.port = port
-        self.meter = meter
-        self.interval = interval
-
-    def startProtocol(self):
-        """Connect to destination host."""
-        self.meter.connect(self.transport, self.host, self.port)
-
-    def stopProtocol(self):
-        """Connection was lost."""
-        self.meter.disconnect()
-
-
 class GraphiteProtocol(LineOnlyReceiver):
     """A client protocol for talking to Graphite.
 

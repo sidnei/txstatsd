@@ -7,7 +7,7 @@ from twisted.internet import reactor
 from twisted.python import usage, util
 
 from txstatsd import process
-from txstatsd.metrics import InProcessMeter
+from txstatsd.metrics.meter import InProcessMeter
 from txstatsd.processor import MessageProcessor
 from txstatsd.protocol import GraphiteClientFactory, StatsDServerProtocol
 from txstatsd.report import ReportingService

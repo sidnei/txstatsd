@@ -1,3 +1,4 @@
+from collections import deque
 import re
 import time
 import logging
@@ -20,6 +21,9 @@ TIMERS_MESSAGE = (
     "stats.timers.%(key)s.lower %(lower)s %(timestamp)s\n"
     "stats.timers.%(key)s.count %(count)s %(timestamp)s\n")
 
+GAUGE_METRIC_MESSAGE = (
+    "stats.gauge.%(key)s.value %(value)s %(timestamp)s\n")
+
 
 def normalize_key(key):
     """
@@ -38,6 +42,7 @@ class MessageProcessor(object):
         self.time_function = time_function
         self.timers = {}
         self.counters = {}
+        self.gauge_metrics = deque()
 
     def fail(self, message):
         """Log and discard malformed message."""
@@ -45,8 +50,8 @@ class MessageProcessor(object):
 
     def process(self, message):
         """
-        Process a single entry, adding it to either C{counters} or C{timers}
-        depending on which kind of message it is.
+        Process a single entry, adding it to either C{counters}, C{timers},
+        or C{gauge_metrics} depending on which kind of message it is.
         """
         if not ":" in message:
             return self.fail(message)
@@ -59,14 +64,13 @@ class MessageProcessor(object):
         if len(fields) < 2 or len(fields) > 3:
             return self.fail(message)
 
-        try:
-            value = float(fields[0])
-        except (TypeError, ValueError):
-            return self.fail(message)
-
         key = normalize_key(key)
 
         if fields[1] == "c":
+            try:
+                value = float(fields[0])
+            except (TypeError, ValueError):
+                return self.fail(message)
             rate = 1
             if len(fields) == 3:
                 match = RATE.match(fields[2])
@@ -77,11 +81,29 @@ class MessageProcessor(object):
                 self.counters[key] = 0
             self.counters[key] += value * (1 / float(rate))
         elif fields[1] == "ms":
+            try:
+                value = float(fields[0])
+            except (TypeError, ValueError):
+                return self.fail(message)
             if key not in self.timers:
                 self.timers[key] = []
             self.timers[key].append(value)
+        elif fields[1] == "g":
+            self.process_gauge_metric(key, fields[0], message)
         else:
             return self.fail(message)
+
+    def process_gauge_metric(self, key, composite, message):
+        values = composite.split(":")
+        if not len(values) == 1:
+            return self.fail(message)
+
+        try:
+            metric = [float(v) for v in values]
+            metric.append(key)
+            self.gauge_metrics.append(metric)
+        except (TypeError, ValueError):
+            self.fail(message)
 
     def flush(self, interval=10000, percent=90):
         """
@@ -136,5 +158,28 @@ class MessageProcessor(object):
                     "count": count,
                     "timestamp": timestamp})
 
+        gauge_metrics, events = self.flush_gauge_metrics(timestamp)
+        if events > 0:
+            messages.extend(gauge_metrics)
+            num_stats += events
+
         messages.append("statsd.numStats %s %s" % (num_stats, timestamp))
         return messages
+
+    def flush_gauge_metrics(self, timestamp):
+        metrics = []
+        events = 0
+        for metric in self.gauge_metrics:
+            value = metric[0]
+            key = metric[1]
+
+            message = GAUGE_METRIC_MESSAGE % {
+                "key": key,
+                "value": value,
+                "timestamp": timestamp}
+            metrics.append(message)
+            events += 1
+
+        self.gauge_metrics.clear()
+
+        return (metrics, events)

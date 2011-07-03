@@ -1,6 +1,6 @@
 from twisted.application.service import Application
 
-from txstatsd import service
+from txstatsd.server import service
 
 application = Application("statsd")
 

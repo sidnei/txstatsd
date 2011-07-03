@@ -1,6 +1,6 @@
 from unittest import TestCase
 
-from txstatsd.processor import MessageProcessor
+from txstatsd.server.processor import MessageProcessor
 
 
 class TestMessageProcessor(MessageProcessor):
@@ -48,6 +48,18 @@ class ProcessMessagesTest(TestCase):
         self.processor.process("glork:320|ms")
         self.assertEqual(1, len(self.processor.timers))
         self.assertEqual([320], self.processor.timers["glork"])
+
+    def test_receive_gauge_metric(self):
+        """
+        A gauge metric message takes the form:
+        '<name>:<count>|g'.
+        'g' indicates this is a gauge metric message.
+        """
+        self.processor.process("gorets:9.6|g")
+        self.assertEqual(1, len(self.processor.gauge_metrics))
+        self.assertEqual(
+            [9.6, 'gorets'],
+            self.processor.gauge_metrics.pop())
 
     def test_receive_message_no_fields(self):
         """
@@ -195,3 +207,20 @@ class FlushMessagesTest(TestCase):
         self.assertEqual("stats.timers.glork.count 6 42", timers[4])
         self.assertEqual("statsd.numStats 1 42", messages[1])
         self.assertEqual([], self.processor.timers["glork"])
+
+    def test_flush_gauge_metric(self):
+        """
+        Test the correct rendering of the Graphite report for
+        a gauge metric.
+        """
+
+        self.processor.process("gorets:9.6|g")
+
+        messages = self.processor.flush()
+        self.assertEqual(2, len(messages))
+        gauge_metric = messages[0].splitlines()
+        self.assertEqual(
+            "stats.gauge.gorets.value 9.6 42", gauge_metric[0])
+        self.assertEqual(
+            "statsd.numStats 1 42", messages[1])
+        self.assertEqual(0, len(self.processor.gauge_metrics))
