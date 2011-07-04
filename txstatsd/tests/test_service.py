@@ -2,7 +2,7 @@ import ConfigParser
 import tempfile
 from unittest import TestCase
 
-from txstatsd.server import service
+from txstatsd import service
 
 
 class GlueOptionsTestCase(TestCase):

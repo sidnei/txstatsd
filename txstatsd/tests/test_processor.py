@@ -25,8 +25,8 @@ class ProcessMessagesTest(TestCase):
         unit. 'c' is simply used to signal that this is a counter message.
         """
         self.processor.process("gorets:1|c")
-        self.assertEqual(1, len(self.processor.counters))
-        self.assertEqual(1.0, self.processor.counters["gorets"])
+        self.assertEqual(1, len(self.processor.counter_metrics))
+        self.assertEqual(1.0, self.processor.counter_metrics["gorets"])
 
     def test_receive_counter_rate(self):
         """
@@ -37,8 +37,8 @@ class ProcessMessagesTest(TestCase):
         counter value.
         """
         self.processor.process("gorets:1|c|@0.1")
-        self.assertEqual(1, len(self.processor.counters))
-        self.assertEqual(10.0, self.processor.counters["gorets"])
+        self.assertEqual(1, len(self.processor.counter_metrics))
+        self.assertEqual(10.0, self.processor.counter_metrics["gorets"])
 
     def test_receive_timer(self):
         """
@@ -46,8 +46,8 @@ class ProcessMessagesTest(TestCase):
         identifier and '320' is the time in milliseconds.
         """
         self.processor.process("glork:320|ms")
-        self.assertEqual(1, len(self.processor.timers))
-        self.assertEqual([320], self.processor.timers["glork"])
+        self.assertEqual(1, len(self.processor.timer_metrics))
+        self.assertEqual([320], self.processor.timer_metrics["glork"])
 
     def test_receive_gauge_metric(self):
         """
@@ -66,8 +66,8 @@ class ProcessMessagesTest(TestCase):
         If a timer message has no fields, it is logged and discarded.
         """
         self.processor.process("glork")
-        self.assertEqual(0, len(self.processor.timers))
-        self.assertEqual(0, len(self.processor.counters))
+        self.assertEqual(0, len(self.processor.timer_metrics))
+        self.assertEqual(0, len(self.processor.counter_metrics))
         self.assertEqual(["glork"], self.processor.failures)
 
     def test_receive_counter_no_value(self):
@@ -75,7 +75,7 @@ class ProcessMessagesTest(TestCase):
         If a counter message has no value, it is logged and discarded.
         """
         self.processor.process("gorets:|c")
-        self.assertEqual(0, len(self.processor.counters))
+        self.assertEqual(0, len(self.processor.counter_metrics))
         self.assertEqual(["gorets:|c"], self.processor.failures)
 
     def test_receive_timer_no_value(self):
@@ -83,7 +83,7 @@ class ProcessMessagesTest(TestCase):
         If a timer message has no value, it is logged and discarded.
         """
         self.processor.process("glork:|ms")
-        self.assertEqual(0, len(self.processor.timers))
+        self.assertEqual(0, len(self.processor.timer_metrics))
         self.assertEqual(["glork:|ms"], self.processor.failures)
 
     def test_receive_not_enough_fields(self):
@@ -91,8 +91,8 @@ class ProcessMessagesTest(TestCase):
         If a timer message has not enough fields, it is logged and discarded.
         """
         self.processor.process("glork:1")
-        self.assertEqual(0, len(self.processor.timers))
-        self.assertEqual(0, len(self.processor.counters))
+        self.assertEqual(0, len(self.processor.timer_metrics))
+        self.assertEqual(0, len(self.processor.counter_metrics))
         self.assertEqual(["glork:1"], self.processor.failures)
 
     def test_receive_too_many_fields(self):
@@ -100,8 +100,8 @@ class ProcessMessagesTest(TestCase):
         If a timer message has too many fields, it is logged and discarded.
         """
         self.processor.process("gorets:1|c|@0.1|yay")
-        self.assertEqual(0, len(self.processor.timers))
-        self.assertEqual(0, len(self.processor.counters))
+        self.assertEqual(0, len(self.processor.timer_metrics))
+        self.assertEqual(0, len(self.processor.counter_metrics))
         self.assertEqual(["gorets:1|c|@0.1|yay"], self.processor.failures)
 
 
@@ -122,28 +122,28 @@ class FlushMessagesTest(TestCase):
         If a counter is present, flushing it will generate a counter message
         normalized to the default interval.
         """
-        self.processor.counters["gorets"] = 42
+        self.processor.counter_metrics["gorets"] = 42
         messages = self.processor.flush()
         self.assertEqual(2, len(messages))
         counters = messages[0].splitlines()
         self.assertEqual("stats.gorets 4 42", counters[0])
         self.assertEqual("stats_counts.gorets 42 42", counters[1])
         self.assertEqual("statsd.numStats 1 42", messages[1])
-        self.assertEqual(0, self.processor.counters["gorets"])
+        self.assertEqual(0, self.processor.counter_metrics["gorets"])
 
     def test_flush_counter_one_second_interval(self):
         """
         It is possible to flush counters with a one-second interval, in which
         case the counter value will be unchanged.
         """
-        self.processor.counters["gorets"] = 42
+        self.processor.counter_metrics["gorets"] = 42
         messages = self.processor.flush(interval=1000)
         self.assertEqual(2, len(messages))
         counters = messages[0].splitlines()
         self.assertEqual("stats.gorets 42 42", counters[0])
         self.assertEqual("stats_counts.gorets 42 42", counters[1])
         self.assertEqual("statsd.numStats 1 42", messages[1])
-        self.assertEqual(0, self.processor.counters["gorets"])
+        self.assertEqual(0, self.processor.counter_metrics["gorets"])
 
     def test_flush_single_timer_single_time(self):
         """
@@ -151,7 +151,7 @@ class FlushMessagesTest(TestCase):
         threshold_upper, lower, mean will be set to the same value. Timer is
         reset after flush is called.
         """
-        self.processor.timers["glork"] = [24]
+        self.processor.timer_metrics["glork"] = [24]
         messages = self.processor.flush()
         self.assertEqual(2, len(messages))
         timers = messages[0].splitlines()
@@ -161,7 +161,7 @@ class FlushMessagesTest(TestCase):
         self.assertEqual("stats.timers.glork.lower 24 42", timers[3])
         self.assertEqual("stats.timers.glork.count 1 42", timers[4])
         self.assertEqual("statsd.numStats 1 42", messages[1])
-        self.assertEqual([], self.processor.timers["glork"])
+        self.assertEqual([], self.processor.timer_metrics["glork"])
 
     def test_flush_single_timer_multiple_times(self):
         """
@@ -172,7 +172,7 @@ class FlushMessagesTest(TestCase):
         - count will be the count of data points
         - mean will be the mean value within the 90th percentile
         """
-        self.processor.timers["glork"] = [4, 8, 15, 16, 23, 42]
+        self.processor.timer_metrics["glork"] = [4, 8, 15, 16, 23, 42]
         messages = self.processor.flush()
         self.assertEqual(2, len(messages))
         timers = messages[0].splitlines()
@@ -182,7 +182,7 @@ class FlushMessagesTest(TestCase):
         self.assertEqual("stats.timers.glork.lower 4 42", timers[3])
         self.assertEqual("stats.timers.glork.count 6 42", timers[4])
         self.assertEqual("statsd.numStats 1 42", messages[1])
-        self.assertEqual([], self.processor.timers["glork"])
+        self.assertEqual([], self.processor.timer_metrics["glork"])
 
     def test_flush_single_timer_50th_percentile(self):
         """
@@ -196,7 +196,7 @@ class FlushMessagesTest(TestCase):
         - count will be the count of data points
         - mean will be the mean value within the 50th percentile
         """
-        self.processor.timers["glork"] = [4, 8, 15, 16, 23, 42]
+        self.processor.timer_metrics["glork"] = [4, 8, 15, 16, 23, 42]
         messages = self.processor.flush(percent=50)
         self.assertEqual(2, len(messages))
         timers = messages[0].splitlines()
@@ -206,7 +206,7 @@ class FlushMessagesTest(TestCase):
         self.assertEqual("stats.timers.glork.lower 4 42", timers[3])
         self.assertEqual("stats.timers.glork.count 6 42", timers[4])
         self.assertEqual("statsd.numStats 1 42", messages[1])
-        self.assertEqual([], self.processor.timers["glork"])
+        self.assertEqual([], self.processor.timer_metrics["glork"])
 
     def test_flush_gauge_metric(self):
         """

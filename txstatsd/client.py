@@ -25,18 +25,18 @@ class StatsDClientProtocol(DatagramProtocol):
         self.client.disconnect()
 
 
-class StatsDClient(object):
+class TwistedStatsDClient(object):
 
     def __init__(self, host, port,
                  connect_callback=None, disconnect_callback=None):
-         """Build a connection that reports to the endpoint (on
-         C{host} and C{port}) using UDP.
+        """Build a connection that reports to the endpoint (on
+        C{host} and C{port}) using UDP.
 
-         @param host: The StatsD server host.
-         @param port: The StatsD server port.
-         @param connect_callback: The callback to invoke on connection.
-         @param disconnect_callback: The callback to invoke on disconnection.
-         """
+        @param host: The StatsD server host.
+        @param port: The StatsD server port.
+        @param connect_callback: The callback to invoke on connection.
+        @param disconnect_callback: The callback to invoke on disconnection.
+        """
 
         self.host = host
         self.port = port
@@ -92,3 +92,24 @@ class UdpStatsDClient(object):
         if self.addr is None or self.socket is None:
             return
         self.socket.sendto(data, self.addr)
+
+
+class InternalClient(object):
+    """A connection that can be used inside the C{StatsD} daemon itself."""
+
+    def __init__(self, processor):
+        """
+        A connection that writes directly to the C{MessageProcessor}.
+        """
+        self._processor = processor
+
+    def connect(self):
+        pass
+
+    def disconnect(self):
+        pass
+
+    def write(self, data):
+        """Write directly to the C{MessageProcessor}."""
+        self._processor.process(data)
+

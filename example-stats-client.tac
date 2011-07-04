@@ -6,18 +6,18 @@ from twisted.internet import task
 
 from twisted.application.service import Application
 
-from txstatsd.client.client import (
-    StatsDClient, StatsDClientProtocol)
+from txstatsd.client import (
+    TwistedStatsDClient, StatsDClientProtocol)
 from txstatsd.metrics.metrics import Metrics
 from txstatsd.process import PROCESS_STATS
-from txstatsd.server.report import ReportingService
+from txstatsd.report import ReportingService
 
 
 STATSD_HOST = "127.0.0.1"
 STATSD_PORT = 8125
 
 application = Application("example-stats-client")
-statsd_client = StatsDClient(STATSD_HOST, STATSD_PORT)
+statsd_client = TwistedStatsDClient(STATSD_HOST, STATSD_PORT)
 metrics = Metrics(connection=statsd_client,
                   namespace=socket.gethostname() + ".example-client")
 

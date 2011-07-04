@@ -3,7 +3,7 @@ from zope.interface import implements
 from twisted.plugin import IPlugin
 from twisted.application.service import IServiceMaker
 
-from txstatsd.server import service
+from txstatsd import service
 
 
 class StatsDServiceMaker(object):
