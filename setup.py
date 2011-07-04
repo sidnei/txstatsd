@@ -27,6 +27,9 @@ long_description = """
 Twisted-based implementation of a statsd-compatible server and client.
 """
 
+def refresh_plugin_cache():
+    from twisted.plugin import IPlugin, getPlugins
+    list(getPlugins(IPlugin))
 
 setup(
     name="txStatsD",
@@ -35,7 +38,7 @@ setup(
     author="txStatsD Developers",
     url="https://launchpad.net/txstatsd",
     license="MIT",
-    packages=find_packages(),
+    packages=find_packages() + ["twisted.plugins"],
     scripts=glob("./bin/*"),
     long_description=long_description,
     classifiers=[
@@ -50,3 +53,4 @@ setup(
        ],
     **extra_setup_args
     )
+refresh_plugin_cache()

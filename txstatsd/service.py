@@ -46,10 +46,16 @@ class OptionsGlue(usage.Options):
             self._config_file = ConfigParser.RawConfigParser()
             self._config_file.read(fname)
             
-        if self._config_file is not None:             
-            return self._config_file.get("main", item)
+        if self._config_file is not None:
+            try:
+                result = self._config_file.get("main", item)
+            except ConfigParser.NoOptionError:
+                pass
+            else:
+                if item in self._dispatch:
+                    result = self._dispatch[item].coerce(result)
+                return result
             
-        
         return self.glue_defaults[item]
     
     
