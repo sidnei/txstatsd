@@ -40,8 +40,8 @@ class MessageProcessor(object):
 
     def __init__(self, time_function=time.time):
         self.time_function = time_function
-        self.timers = {}
-        self.counters = {}
+        self.timer_metrics = {}
+        self.counter_metrics = {}
         self.gauge_metrics = deque()
 
     def fail(self, message):
@@ -67,31 +67,37 @@ class MessageProcessor(object):
         key = normalize_key(key)
 
         if fields[1] == "c":
-            try:
-                value = float(fields[0])
-            except (TypeError, ValueError):
-                return self.fail(message)
-            rate = 1
-            if len(fields) == 3:
-                match = RATE.match(fields[2])
-                if match is None:
-                    return self.fail(message)
-                rate = match.group(1)
-            if key not in self.counters:
-                self.counters[key] = 0
-            self.counters[key] += value * (1 / float(rate))
+            self.process_counter_metric(key, fields, message)
         elif fields[1] == "ms":
-            try:
-                value = float(fields[0])
-            except (TypeError, ValueError):
-                return self.fail(message)
-            if key not in self.timers:
-                self.timers[key] = []
-            self.timers[key].append(value)
+            self.process_timer_metric(key, fields[0], message)
         elif fields[1] == "g":
             self.process_gauge_metric(key, fields[0], message)
         else:
             return self.fail(message)
+
+    def process_timer_metric(self, key, value, message):
+        try:
+            value = float(value)
+        except (TypeError, ValueError):
+            return self.fail(message)
+        if key not in self.timer_metrics:
+            self.timer_metrics[key] = []
+        self.timer_metrics[key].append(value)
+
+    def process_counter_metric(self, key, composite, message):
+        try:
+            value = float(composite[0])
+        except (TypeError, ValueError):
+            return self.fail(message)
+        rate = 1
+        if len(composite) == 3:
+            match = RATE.match(composite[2])
+            if match is None:
+                return self.fail(message)
+            rate = match.group(1)
+        if key not in self.counter_metrics:
+            self.counter_metrics[key] = 0
+        self.counter_metrics[key] += value * (1 / float(rate))
 
     def process_gauge_metric(self, key, composite, message):
         values = composite.split(":")
@@ -115,22 +121,50 @@ class MessageProcessor(object):
         interval = interval / 1000
         timestamp = int(self.time_function())
 
-        for key, count in self.counters.iteritems():
-            self.counters[key] = 0
+        counter_metrics, events = self.flush_counter_metrics(interval, timestamp)
+        if events > 0:
+            messages.extend(counter_metrics)
+            num_stats += events
+
+        timer_metrics, events = self.flush_timer_metrics(percent, timestamp)
+        if events > 0:
+            messages.extend(timer_metrics)
+            num_stats += events
+
+        gauge_metrics, events = self.flush_gauge_metrics(timestamp)
+        if events > 0:
+            messages.extend(gauge_metrics)
+            num_stats += events
+
+        messages.append("statsd.numStats %s %s" % (num_stats, timestamp))
+        return messages
+
+    def flush_counter_metrics(self, interval, timestamp):
+        metrics = []
+        events = 0
+        for key, count in self.counter_metrics.iteritems():
+            self.counter_metrics[key] = 0
 
             value = count / interval
-            messages.append(COUNTERS_MESSAGE % {
+            message = COUNTERS_MESSAGE % {
                 "key": key,
                 "value": value,
                 "count": count,
-                "timestamp": timestamp})
-            num_stats += 1
+                "timestamp": timestamp}
+            metrics.append(message)
+            events += 1
+
+        return (metrics, events)
+
+    def flush_timer_metrics(self, percent, timestamp):
+        metrics = []
+        events = 0
 
         threshold_value = ((100 - percent) / 100.0)
-        for key, timers in self.timers.iteritems():
+        for key, timers in self.timer_metrics.iteritems():
             count = len(timers)
             if count > 0:
-                self.timers[key] = []
+                self.timer_metrics[key] = []
 
                 timers.sort()
                 lower = timers[0]
@@ -146,9 +180,7 @@ class MessageProcessor(object):
                     threshold_upper = timers[-1]
                     mean = sum(timers) / index
 
-                num_stats += 1
-
-                messages.append(TIMERS_MESSAGE % {
+                message = TIMERS_MESSAGE % {
                     "key": key,
                     "mean": mean,
                     "upper": upper,
@@ -156,15 +188,11 @@ class MessageProcessor(object):
                     "threshold_upper": threshold_upper,
                     "lower": lower,
                     "count": count,
-                    "timestamp": timestamp})
+                    "timestamp": timestamp}
+                metrics.append(message)
+                events += 1
 
-        gauge_metrics, events = self.flush_gauge_metrics(timestamp)
-        if events > 0:
-            messages.extend(gauge_metrics)
-            num_stats += events
-
-        messages.append("statsd.numStats %s %s" % (num_stats, timestamp))
-        return messages
+        return (metrics, events)
 
     def flush_gauge_metrics(self, timestamp):
         metrics = []
