@@ -75,7 +75,6 @@ class StatsdOptions(OptionsGlue):
     ]
         
     
-
 def createService(options):
     """Create a statsd service."""
     
