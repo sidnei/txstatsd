@@ -1,5 +1,5 @@
 include README
 include LICENSE
 include setup.py
-recursive-include bin
-recursive-include txstatsd/*.py
+recursive-include txstatsd *.py
+graft twisted

@@ -23,7 +23,7 @@ class BaseMeter(object):
 
     def decrement(self, name, count=1):
         """Report and decrease in name by count."""
-        self.increment(name, count*-1)
+        self.increment(name, count * -1)
 
     def done(self, name):
         """Report that name completed successfully."""

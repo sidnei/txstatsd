@@ -1,0 +1,6 @@
+[main]
+# these are all the default values
+carbon-cache-host: localhost
+carbon-cache-port: 2003
+listen-port: 8125
+flush-interval: 10000

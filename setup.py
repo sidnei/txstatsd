@@ -1,6 +1,9 @@
 from distutils.core import setup
+from distutils.command.install import install
 from glob import glob
 import os
+
+from twisted.plugin import IPlugin, getPlugins
 
 from txstatsd import version
 
@@ -28,14 +31,25 @@ Twisted-based implementation of a statsd-compatible server and client.
 """
 
 
+class TxPluginInstaller(install):
+    def run(self):
+        install.run(self)
+        # Make sure we refresh the plugin list when installing, so we know
+        # we have enough write permissions.
+        # see http://twistedmatrix.com/documents/current/core/howto/plugin.html
+        # "when installing or removing software which provides Twisted plugins,
+        # the site administrator should be sure the cache is regenerated"
+        list(getPlugins(IPlugin))
+
 setup(
+    cmdclass = {'install': TxPluginInstaller},
     name="txStatsD",
     version=version.txstatsd,
     description="A network daemon for aggregating statistics",
     author="txStatsD Developers",
     url="https://launchpad.net/txstatsd",
     license="MIT",
-    packages=find_packages(),
+    packages=find_packages() + ["twisted.plugins"],
     scripts=glob("./bin/*"),
     long_description=long_description,
     classifiers=[
@@ -50,3 +64,4 @@ setup(
        ],
     **extra_setup_args
     )
+

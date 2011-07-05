@@ -15,7 +15,8 @@ COUNTERS_MESSAGE = (
 TIMERS_MESSAGE = (
     "stats.timers.%(key)s.mean %(mean)s %(timestamp)s\n"
     "stats.timers.%(key)s.upper %(upper)s %(timestamp)s\n"
-    "stats.timers.%(key)s.upper_%(percent)s %(threshold_upper)s %(timestamp)s\n"
+    "stats.timers.%(key)s.upper_%(percent)s %(threshold_upper)s"
+        " %(timestamp)s\n"
     "stats.timers.%(key)s.lower %(lower)s %(timestamp)s\n"
     "stats.timers.%(key)s.count %(count)s %(timestamp)s\n")
 
@@ -55,7 +56,7 @@ class MessageProcessor(object):
             return self.fail(message)
 
         fields = data.split("|")
-        if len(fields) < 2 or len(fields) > 3 :
+        if len(fields) < 2 or len(fields) > 3:
             return self.fail(message)
 
         try:
