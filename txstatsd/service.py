@@ -9,59 +9,67 @@ from txstatsd.protocol import GraphiteClientFactory, StatsDServerProtocol
 
 _unset = object()
 
+
 class OptionsGlue(usage.Options):
     """
     Extends usage.Options to also read parameters from a config file.
     """
-    
+
     optParameters = []
-    
+
     def __init__(self):
         self.glue_defaults = {}
-        self.__class__.optParameters = []
         self._config_file = None
         config = ["config", "c", None, "Config file to use."]
-        
+
+        new_params = []
+
         def process_parameter(parameter):
             long, short, default, doc, paramType = util.padTo(5, parameter)
             self.glue_defaults[long] = default
-            OptionsGlue.optParameters.append(
+            new_params.append(
                 [long, short, _unset, doc, paramType])
-            
+
         for parameter in self.glue_parameters:
             if parameter[0] == "config" or parameter[1] == "c":
                 raise ValueError("the --config/-c parameter is reserved.")
             process_parameter(parameter)
         process_parameter(config)
-            
+
+        # we need to change self.__class__.optParameters as usage.Options
+        # will collect the config from there, not self.optParameters:
+        # reflect.accumulateClassList(self.__class__, 'optParameters',
+        #                            parameters)
+        self.__class__.optParameters = new_params
+
         super(OptionsGlue, self).__init__()
-    
+
     def __getitem__(self, item):
         result = super(OptionsGlue, self).__getitem__(item)
         if result is not _unset:
             return result
-        
+
         fname = super(OptionsGlue, self).__getitem__("config")
         if fname is not _unset:
             self._config_file = ConfigParser.RawConfigParser()
             self._config_file.read(fname)
-            
+
         if self._config_file is not None:
             try:
-                result = self._config_file.get("main", item)
+                result = self._config_file.get("statsd", item)
             except ConfigParser.NoOptionError:
                 pass
             else:
                 if item in self._dispatch:
                     result = self._dispatch[item].coerce(result)
                 return result
-            
+
         return self.glue_defaults[item]
-    
-    
-class StatsdOptions(OptionsGlue):
+
+
+class StatsDOptions(OptionsGlue):
     """
-    The set of configuration setting for txstatsd.
+    The set of configuration settings for txStatsD.
     """
     glue_parameters = [
         ["carbon-cache-host", "h", "localhost",
@@ -73,13 +81,13 @@ class StatsdOptions(OptionsGlue):
         ["flush-interval", "i", 10000,
             "The number of milliseconds between each flush.", int],
     ]
-        
-    
+
+
 def createService(options):
-    """Create a statsd service."""
-    
+    """Create a txStatsD service."""
+
     service = MultiService()
-    service.setName("txstatsd")
+    service.setName("statsd")
     processor = MessageProcessor()
 
     factory = GraphiteClientFactory(processor, options["flush-interval"])
@@ -89,7 +97,7 @@ def createService(options):
     client.setServiceParent(service)
 
     listener = UDPServer(options["listen-port"],
-              StatsDServerProtocol(processor))
+        StatsDServerProtocol(processor))
     listener.setServiceParent(service)
-    
+
     return service
