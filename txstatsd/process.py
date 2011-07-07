@@ -79,9 +79,9 @@ def report_self_stat(process=psutil.Process(os.getpid()), prefix="self.stat."):
               prefix + "memory.percent": process.get_memory_percent(),
               prefix + "memory.vsize": vsize,
               prefix + "memory.rss": rss}
-    if getattr(process, "get_process_io_counters", None) is not None:
+    if getattr(process, "get_io_counters", None) is not None:
         (read_count, write_count,
-         read_bytes, write_bytes) = process.get_process_io_counters()
+         read_bytes, write_bytes) = process.get_io_counters()
         result.update({
             prefix + "io.count.read": read_count,
             prefix + "io.count.write": write_count,

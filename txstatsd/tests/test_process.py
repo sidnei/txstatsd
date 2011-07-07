@@ -111,7 +111,7 @@ class TestSystemPerformance(TestCase, MockerTestCase):
         self.expect(mock.get_cpu_times()).result((utime, stime))
         self.expect(mock.get_cpu_percent()).result(cpu_percent)
         self.expect(mock.get_memory_percent()).result(memory_percent)
-        self.expect(mock.get_process_io_counters).result(None)
+        self.expect(mock.get_io_counters).result(None)
         self.mocker.replay()
 
         result = report_self_stat(process=mock)
@@ -122,7 +122,7 @@ class TestSystemPerformance(TestCase, MockerTestCase):
         self.assertEqual(rss, result["self.stat.memory.rss"])
         self.assertEqual(memory_percent, result["self.stat.memory.percent"])
 
-        # If the version of psutil doesn't have the C{get_process_io_counters},
+        # If the version of psutil doesn't have the C{get_io_counters},
         # then io stats are not included in the output.
         self.failIf("self.stat.io.count.read" in result)
         self.failIf("self.stat.io.count.write" in result)
@@ -134,7 +134,7 @@ class TestSystemPerformance(TestCase, MockerTestCase):
         """
         Process stat info is collected through psutil.
 
-        If C{get_process_io_counters} is implemented by the L{Process} object,
+        If C{get_io_counters} is implemented by the L{Process} object,
         then io information will be returned with the process information.
         """
         process = psutil.Process(os.getpid())
@@ -149,8 +149,8 @@ class TestSystemPerformance(TestCase, MockerTestCase):
         self.expect(mock.get_cpu_times()).result((utime, stime))
         self.expect(mock.get_cpu_percent()).result(cpu_percent)
         self.expect(mock.get_memory_percent()).result(memory_percent)
-        self.expect(mock.get_process_io_counters).result(mock)
-        self.expect(mock.get_process_io_counters()).result(io_counters)
+        self.expect(mock.get_io_counters).result(mock)
+        self.expect(mock.get_io_counters()).result(io_counters)
         self.mocker.replay()
 
         result = report_self_stat(process=mock)
