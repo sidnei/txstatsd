@@ -6,6 +6,7 @@ from txstatsd import service
 
 
 class GlueOptionsTestCase(TestCase):
+
     def test_defaults(self):
         """
         Defaults get passed over to the instance.
@@ -94,6 +95,7 @@ class GlueOptionsTestCase(TestCase):
 
 
 class ServiceTests(TestCase):
+
     def test_service(self):
         """
         The StatsD service can be created.
