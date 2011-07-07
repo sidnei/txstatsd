@@ -1,4 +1,5 @@
 import os
+import psutil
 
 from twisted.internet import defer, fdesc, error
 from twisted.python import log
@@ -7,13 +8,6 @@ from twisted.python import log
 MEMINFO_KEYS = ("MemTotal:", "MemFree:", "Buffers:",
                 "Cached:", "SwapCached:", "SwapTotal:",
                 "SwapFree:")
-
-SELF_STAT_POSITIONS = {"utime": 13,
-                       "stime": 14,
-                       "vsize": 22,
-                       "rss": 23,
-                       "blkio_ticks": 41,
-                       "gtime": 42}
 
 MULTIPLIERS = {"kB": 1024, "mB": 1024 * 1024}
 
@@ -41,40 +35,6 @@ def load_file(filename):
 
     read_loop("")
     return d
-
-
-def parse_self_stat(data, prefix="self.stat."):
-    """Parse data from /proc/self/stat."""
-    parts = data.split()
-    result = {}
-
-    for key, value in SELF_STAT_POSITIONS.items():
-        if len(parts) <= value:
-            continue
-
-        result[prefix + key] = int(parts[value])
-
-    return result
-
-
-def parse_stat(data, prefix="stat."):
-    """Parse data from /proc/stat."""
-    result = {}
-
-    for line in data.split("\n"):
-        if not line:
-            continue
-        parts = [x for x in line.split(" ") if x]
-        label = parts[0]
-        if len(label) < 3 or label[:3] != 'cpu':
-            continue
-
-        for key, value in zip("user nice system idle iowait irq "
-                              "softirq steal guest".split(),
-                              (int(x) for x in parts[1:])):
-            result[prefix + label + "." + key] = value
-
-    return result
 
 
 def parse_meminfo(data, prefix="meminfo."):
@@ -110,11 +70,31 @@ def parse_loadavg(data, prefix="loadavg."):
         [float(x) for x in data.split()[:3]]))
 
 
-PROCESS_STATS = (("/proc/self/stat", parse_self_stat),)
+def report_self_stat(process=psutil.Process(os.getpid()), prefix="self.stat."):
+    vsize, rss = process.get_memory_info()
+    utime, stime = process.get_cpu_times()
+    return {prefix + "cpu.percent": process.get_cpu_percent(),
+            prefix + "cpu.user": utime,
+            prefix + "cpu.system": stime,
+            prefix + "memory.percent": process.get_memory_percent(),
+            prefix + "memory.vsize": vsize,
+            prefix + "memory.rss": rss}
+
+def report_system_stat(prefix="stat."):
+    cpu_times = psutil.cpu_times()
+    return {prefix + "cpu.idle": cpu_times.idle,
+            prefix + "cpu.iowait": cpu_times.iowait,
+            prefix + "cpu.irq": cpu_times.irq,
+            prefix + "cpu.nice": cpu_times.nice,
+            prefix + "cpu.system": cpu_times.system,
+            prefix + "cpu.user": cpu_times.user}
+
+
+PROCESS_STATS = ((None, report_self_stat),)
 
 SYSTEM_STATS = (("/proc/meminfo", parse_meminfo),
                 ("/proc/loadavg", parse_loadavg),
-                ("/proc/stat", parse_stat),) + PROCESS_STATS
+                (None, report_system_stat),) + PROCESS_STATS
 
 
 def send_metrics(metrics, meter):
@@ -131,11 +111,17 @@ def report_stats(stats, meter):
 
     deferreds = []
     for filename, func in stats:
-        deferred = load_file(filename)
-        deferred.addCallback(func)
+        if filename is not None:
+            name = filename
+            deferred = load_file(filename)
+            deferred.addCallback(func)
+        else:
+            name = func.func_name
+            deferred = defer.maybeDeferred(func)
+
         deferred.addCallback(send_metrics, meter)
         deferred.addErrback(lambda failure: log.err(
-            failure, "Error while processing %s" % filename))
+            failure, "Error while processing %s" % name))
         deferreds.append(deferred)
 
     return defer.DeferredList(deferreds)
