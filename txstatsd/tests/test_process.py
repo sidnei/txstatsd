@@ -7,7 +7,8 @@ from twisted.trial.unittest import TestCase
 
 from txstatsd.process import (
     load_file, parse_meminfo, parse_loadavg,
-    report_self_stat, report_system_stat)
+    report_process_memory_and_cpu, report_process_io_counters,
+    report_process_net_stats, report_system_stats)
 
 
 meminfo = """\
@@ -90,13 +91,13 @@ class TestSystemPerformance(TestCase, MockerTestCase):
         self.expect(mock()).result(cpu_times)
         self.mocker.replay()
 
-        result = report_system_stat()
-        self.assertEqual(cpu_times.idle, result["stat.cpu.idle"])
-        self.assertEqual(cpu_times.iowait, result["stat.cpu.iowait"])
-        self.assertEqual(cpu_times.irq, result["stat.cpu.irq"])
-        self.assertEqual(cpu_times.nice, result["stat.cpu.nice"])
-        self.assertEqual(cpu_times.system, result["stat.cpu.system"])
-        self.assertEqual(cpu_times.user, result["stat.cpu.user"])
+        result = report_system_stats()
+        self.assertEqual(cpu_times.idle, result["sys.cpu.idle"])
+        self.assertEqual(cpu_times.iowait, result["sys.cpu.iowait"])
+        self.assertEqual(cpu_times.irq, result["sys.cpu.irq"])
+        self.assertEqual(cpu_times.nice, result["sys.cpu.nice"])
+        self.assertEqual(cpu_times.system, result["sys.cpu.system"])
+        self.assertEqual(cpu_times.user, result["sys.cpu.user"])
 
     def test_self_statinfo(self):
         """Process stat info is collected through psutil."""
@@ -104,57 +105,99 @@ class TestSystemPerformance(TestCase, MockerTestCase):
         vsize, rss = process.get_memory_info()
         utime, stime = process.get_cpu_times()
         cpu_percent = process.get_cpu_percent()
-        memory_percent = process.get_memory_percent(),
+        memory_percent = process.get_memory_percent()
 
         mock = self.mocker.mock()
         self.expect(mock.get_memory_info()).result((vsize, rss))
         self.expect(mock.get_cpu_times()).result((utime, stime))
         self.expect(mock.get_cpu_percent()).result(cpu_percent)
         self.expect(mock.get_memory_percent()).result(memory_percent)
+        self.expect(mock.get_num_threads()).result(1)
+        self.mocker.replay()
+
+        result = report_process_memory_and_cpu(process=mock)
+        self.assertEqual(utime, result["proc.cpu.user"])
+        self.assertEqual(stime, result["proc.cpu.system"])
+        self.assertEqual(cpu_percent, result["proc.cpu.percent"])
+        self.assertEqual(vsize, result["proc.memory.vsize"])
+        self.assertEqual(rss, result["proc.memory.rss"])
+        self.assertEqual(memory_percent, result["proc.memory.percent"])
+        self.assertEqual(1, result["proc.thread.count"])
+
+    def test_ioinfo(self):
+        """Process IO info is collected through psutil."""
+        mock = self.mocker.mock()
         self.expect(mock.get_io_counters).result(None)
         self.mocker.replay()
 
-        result = report_self_stat(process=mock)
-        self.assertEqual(utime, result["self.stat.cpu.user"])
-        self.assertEqual(stime, result["self.stat.cpu.system"])
-        self.assertEqual(cpu_percent, result["self.stat.cpu.percent"])
-        self.assertEqual(vsize, result["self.stat.memory.vsize"])
-        self.assertEqual(rss, result["self.stat.memory.rss"])
-        self.assertEqual(memory_percent, result["self.stat.memory.percent"])
-
         # If the version of psutil doesn't have the C{get_io_counters},
         # then io stats are not included in the output.
-        self.failIf("self.stat.io.count.read" in result)
-        self.failIf("self.stat.io.count.write" in result)
-        self.failIf("self.stat.io.bytes.read" in result)
-        self.failIf("self.stat.io.bytes.write" in result)
+        result = report_process_io_counters(process=mock)
+        self.failIf("proc.io.count.read" in result)
+        self.failIf("proc.io.count.write" in result)
+        self.failIf("proc.io.bytes.read" in result)
+        self.failIf("proc.io.bytes.write" in result)
 
-
-    def test_self_statinfo_with_io_counters(self):
+    def test_ioinfo_with_get_io_counters(self):
         """
-        Process stat info is collected through psutil.
+        Process IO info is collected through psutil.
 
         If C{get_io_counters} is implemented by the L{Process} object,
         then io information will be returned with the process information.
         """
-        process = psutil.Process(os.getpid())
-        vsize, rss = process.get_memory_info()
-        utime, stime = process.get_cpu_times()
-        cpu_percent = process.get_cpu_percent()
-        memory_percent = process.get_memory_percent(),
         io_counters = (10, 42, 125, 16)
 
         mock = self.mocker.mock()
-        self.expect(mock.get_memory_info()).result((vsize, rss))
-        self.expect(mock.get_cpu_times()).result((utime, stime))
-        self.expect(mock.get_cpu_percent()).result(cpu_percent)
-        self.expect(mock.get_memory_percent()).result(memory_percent)
         self.expect(mock.get_io_counters).result(mock)
         self.expect(mock.get_io_counters()).result(io_counters)
         self.mocker.replay()
 
-        result = report_self_stat(process=mock)
-        self.assertEqual(10, result["self.stat.io.count.read"])
-        self.assertEqual(42, result["self.stat.io.count.write"])
-        self.assertEqual(125, result["self.stat.io.bytes.read"])
-        self.assertEqual(16, result["self.stat.io.bytes.write"])
+        result = report_process_io_counters(process=mock)
+        self.assertEqual(10, result["proc.io.count.read"])
+        self.assertEqual(42, result["proc.io.count.write"])
+        self.assertEqual(125, result["proc.io.bytes.read"])
+        self.assertEqual(16, result["proc.io.bytes.write"])
+
+    def test_netinfo_no_get_connections(self):
+        """
+        Process connection info is collected through psutil.
+
+        If the version of psutil doesn't implement C{get_connections} for
+        L{Process}, then no information is returned.
+        """
+        mock = self.mocker.mock()
+        self.expect(mock.get_connections).result(None)
+        self.mocker.replay()
+
+        # If the version of psutil doesn't have the C{get_io_counters},
+        # then io stats are not included in the output.
+        result = report_process_net_stats(process=mock)
+        self.failIf("proc.net.status.established" in result)
+
+    def test_netinfo_with_get_connections(self):
+        """
+        Process connection info is collected through psutil.
+
+        If the version of psutil implements C{get_connections} for L{Process},
+        then a count of connections in each state is returned.
+        """
+        connections = [
+            (115, 2, 1, ("10.0.0.1", 48776),
+             ("93.186.135.91", 80), "ESTABLISHED"),
+            (117, 2, 1, ("10.0.0.1", 43761),
+             ("72.14.234.100", 80), "CLOSING"),
+            (119, 2, 1, ("10.0.0.1", 60759),
+             ("72.14.234.104", 80), "ESTABLISHED"),
+            (123, 2, 1, ("10.0.0.1", 51314),
+             ("72.14.234.83", 443), "SYN_SENT")
+            ]
+
+        mock = self.mocker.mock()
+        self.expect(mock.get_connections).result(mock)
+        self.expect(mock.get_connections()).result(connections)
+        self.mocker.replay()
+
+        result = report_process_net_stats(process=mock)
+        self.assertEqual(2, result["proc.net.status.established"])
+        self.assertEqual(1, result["proc.net.status.closing"])
+        self.assertEqual(1, result["proc.net.status.syn_sent"])

@@ -70,7 +70,9 @@ def parse_loadavg(data, prefix="loadavg."):
         [float(x) for x in data.split()[:3]]))
 
 
-def report_self_stat(process=psutil.Process(os.getpid()), prefix="self.stat."):
+def report_process_memory_and_cpu(process=psutil.Process(os.getpid()),
+                          prefix="proc."):
+    """Report memory and CPU stats for C{process}."""
     vsize, rss = process.get_memory_info()
     utime, stime = process.get_cpu_times()
     result = {prefix + "cpu.percent": process.get_cpu_percent(),
@@ -78,19 +80,42 @@ def report_self_stat(process=psutil.Process(os.getpid()), prefix="self.stat."):
               prefix + "cpu.system": stime,
               prefix + "memory.percent": process.get_memory_percent(),
               prefix + "memory.vsize": vsize,
-              prefix + "memory.rss": rss}
+              prefix + "memory.rss": rss,
+              prefix + "thread.count": process.get_num_threads()}
+    return result
+
+
+def report_process_io_counters(process=psutil.Process(os.getpid()),
+                       prefix="proc.io."):
+    """Report IO statistics for C{process}."""
+    result = {}
     if getattr(process, "get_io_counters", None) is not None:
         (read_count, write_count,
          read_bytes, write_bytes) = process.get_io_counters()
         result.update({
-            prefix + "io.count.read": read_count,
-            prefix + "io.count.write": write_count,
-            prefix + "io.bytes.read": read_bytes,
-            prefix + "io.bytes.write": write_bytes})
+            prefix + "count.read": read_count,
+            prefix + "count.write": write_count,
+            prefix + "bytes.read": read_bytes,
+            prefix + "bytes.write": write_bytes})
     return result
 
 
-def report_system_stat(prefix="stat."):
+def report_process_net_stats(process=psutil.Process(os.getpid()),
+                             prefix="proc.net."):
+    """Report active connection statistics for C{process}."""
+    result = {}
+    if getattr(process, "get_connections", None) is not None:
+        for connection in process.get_connections():
+            fd, family, _type, laddr, raddr, status = connection
+            key = prefix + "status.%s" % status.lower()
+            if not key in result:
+                result[key] = 1
+            else:
+                result[key] += 1
+    return result
+
+
+def report_system_stats(prefix="sys."):
     cpu_times = psutil.cpu_times()
     return {prefix + "cpu.idle": cpu_times.idle,
             prefix + "cpu.iowait": cpu_times.iowait,
@@ -100,11 +125,15 @@ def report_system_stat(prefix="stat."):
             prefix + "cpu.user": cpu_times.user}
 
 
-PROCESS_STATS = ((None, report_self_stat),)
+PROCESS_STATS = ((None, report_process_memory_and_cpu),)
+
+IO_STATS = ((None, report_process_io_counters),)
+
+NET_STATS = ((None, report_process_net_stats),)
 
 SYSTEM_STATS = (("/proc/meminfo", parse_meminfo),
                 ("/proc/loadavg", parse_loadavg),
-                (None, report_system_stat),) + PROCESS_STATS
+                (None, report_system_stats),)
 
 
 def send_metrics(metrics, meter):
