@@ -75,15 +75,15 @@ class TestSystemPerformance(TestCase, MockerTestCase):
         """We understand loadinfo."""
         loadinfo = "1.02 1.08 1.14 2/2015 19420"
         self.assertEqual(parse_loadavg(loadinfo), {
-            "loadavg.oneminute": 1.02,
-            "loadavg.fiveminutes": 1.08,
-            "loadavg.fifthteenminutes": 1.14})
+            "sys.loadavg.oneminute": 1.02,
+            "sys.loadavg.fiveminutes": 1.08,
+            "sys.loadavg.fifthteenminutes": 1.14})
 
     def test_meminfo(self):
         """We understand meminfo."""
         r = parse_meminfo(meminfo)
-        self.assertEqual(r['meminfo.Buffers'], 8052 * 1024)
-        self.assert_('meminfo.HugePages_Rsvd' not in r)
+        self.assertEqual(r['sys.mem.Buffers'], 8052 * 1024)
+        self.assert_('sys.mem.HugePages_Rsvd' not in r)
 
     def test_statinfo(self):
         """System stat info is collected through psutil."""

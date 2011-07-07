@@ -39,7 +39,7 @@ def load_file(filename):
     return d
 
 
-def parse_meminfo(data, prefix="meminfo."):
+def parse_meminfo(data, prefix="sys.mem."):
     """Parse data from /proc/meminfo."""
     result = {}
 
@@ -63,7 +63,7 @@ def parse_meminfo(data, prefix="meminfo."):
     return result
 
 
-def parse_loadavg(data, prefix="loadavg."):
+def parse_loadavg(data, prefix="sys.loadavg."):
     """Parse data from /proc/loadavg."""
     return dict(zip(
         (prefix + "oneminute",
