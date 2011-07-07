@@ -8,7 +8,8 @@ from twisted.trial.unittest import TestCase
 from txstatsd.process import (
     load_file, parse_meminfo, parse_loadavg,
     report_process_memory_and_cpu, report_process_io_counters,
-    report_process_net_stats, report_system_stats)
+    report_process_net_stats, report_system_stats,
+    report_reactor_stats, report_threadpool_stats)
 
 
 meminfo = """\
@@ -201,3 +202,29 @@ class TestSystemPerformance(TestCase, MockerTestCase):
         self.assertEqual(2, result["proc.net.status.established"])
         self.assertEqual(1, result["proc.net.status.closing"])
         self.assertEqual(1, result["proc.net.status.syn_sent"])
+
+    def test_reactor_stats(self):
+        """Given a twisted reactor, pull out some stats from it."""
+        mock = self.mocker.mock()
+        self.expect(mock.getReaders()).result([None, None, None])
+        self.expect(mock.getWriters()).result([None, None])
+        self.mocker.replay()
+
+        result = report_reactor_stats(mock)()
+        self.assertEqual(3, result["reactor.readers"])
+        self.assertEqual(2, result["reactor.writers"])
+
+    def test_threadpool_stats(self):
+        """Given a twisted threadpool, pull out some stats from it."""
+        mock = self.mocker.mock()
+        self.expect(mock.q.qsize()).result(42)
+        self.expect(mock.threads).result(6 * [None])
+        self.expect(mock.waiters).result(2 * [None])
+        self.expect(mock.working).result(4 * [None])
+        self.mocker.replay()
+
+        result = report_threadpool_stats(mock)()
+        self.assertEqual(42, result["threadpool.queue"])
+        self.assertEqual(6, result["threadpool.threads"])
+        self.assertEqual(2, result["threadpool.waiters"])
+        self.assertEqual(4, result["threadpool.workers"])

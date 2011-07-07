@@ -1,4 +1,5 @@
 import os
+import inspect
 import socket
 import psutil
 
@@ -127,6 +128,32 @@ def report_system_stats(prefix="sys."):
             prefix + "cpu.user": cpu_times.user}
 
 
+class report_threadpool_stats(object):
+    """Report stats about a given threadpool."""
+
+    def __init__(self, threadpool, prefix="threadpool."):
+        self.threadpool = threadpool
+        self.prefix = prefix
+
+    def __call__(self):
+        return {self.prefix + "workers": len(self.threadpool.working),
+                self.prefix + "queue": self.threadpool.q.qsize(),
+                self.prefix + "waiters": len(self.threadpool.waiters),
+                self.prefix + "threads": len(self.threadpool.threads)}
+
+
+class report_reactor_stats(object):
+    """Report statistics about a twisted reactor."""
+
+    def __init__(self, reactor, prefix="reactor."):
+        self.reactor = reactor
+        self.prefix = prefix
+
+    def __call__(self):
+        return {self.prefix + "readers": len(self.reactor.getReaders()),
+                self.prefix + "writers": len(self.reactor.getWriters())}
+
+
 PROCESS_STATS = ((None, report_process_memory_and_cpu),)
 
 IO_STATS = ((None, report_process_io_counters),)
@@ -157,7 +184,10 @@ def report_stats(stats, meter):
             deferred = load_file(filename)
             deferred.addCallback(func)
         else:
-            name = func.func_name
+            if inspect.isfunction(func):
+                name = func.func_name
+            elif inspect.ismethod(func):
+                name = func.im_class.__name__ + "." + func.func_name
             deferred = defer.maybeDeferred(func)
 
         deferred.addCallback(send_metrics, meter)
