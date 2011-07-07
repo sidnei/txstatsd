@@ -2,6 +2,7 @@ import ConfigParser
 
 from twisted.application.internet import TCPClient, UDPServer
 from twisted.application.service import MultiService
+from twisted.internet import reactor
 from twisted.python import usage, util
 
 from txstatsd.processor import MessageProcessor
@@ -95,7 +96,7 @@ def createService(options):
 
     report = None
     if options["report"] is not None:
-        report = ()
+        report = ((None, process.report_reactor_stats(reactor)),)
         reports = [name.strip() for name in options["report"].split(",")]
         for report_name in reports:
             report = report + getattr(process, "%s_STATS" %
