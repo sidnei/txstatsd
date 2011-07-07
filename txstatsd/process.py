@@ -73,12 +73,22 @@ def parse_loadavg(data, prefix="loadavg."):
 def report_self_stat(process=psutil.Process(os.getpid()), prefix="self.stat."):
     vsize, rss = process.get_memory_info()
     utime, stime = process.get_cpu_times()
-    return {prefix + "cpu.percent": process.get_cpu_percent(),
-            prefix + "cpu.user": utime,
-            prefix + "cpu.system": stime,
-            prefix + "memory.percent": process.get_memory_percent(),
-            prefix + "memory.vsize": vsize,
-            prefix + "memory.rss": rss}
+    result = {prefix + "cpu.percent": process.get_cpu_percent(),
+              prefix + "cpu.user": utime,
+              prefix + "cpu.system": stime,
+              prefix + "memory.percent": process.get_memory_percent(),
+              prefix + "memory.vsize": vsize,
+              prefix + "memory.rss": rss}
+    if getattr(process, "get_process_io_counters", None) is not None:
+        (read_count, write_count,
+         read_bytes, write_bytes) = process.get_process_io_counters()
+        result.update({
+            prefix + "io.count.read": read_count,
+            prefix + "io.count.write": write_count,
+            prefix + "io.bytes.read": read_bytes,
+            prefix + "io.bytes.write": write_bytes})
+    return result
+
 
 def report_system_stat(prefix="stat."):
     cpu_times = psutil.cpu_times()

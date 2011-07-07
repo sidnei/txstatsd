@@ -111,6 +111,7 @@ class TestSystemPerformance(TestCase, MockerTestCase):
         self.expect(mock.get_cpu_times()).result((utime, stime))
         self.expect(mock.get_cpu_percent()).result(cpu_percent)
         self.expect(mock.get_memory_percent()).result(memory_percent)
+        self.expect(mock.get_process_io_counters).result(None)
         self.mocker.replay()
 
         result = report_self_stat(process=mock)
@@ -120,3 +121,40 @@ class TestSystemPerformance(TestCase, MockerTestCase):
         self.assertEqual(vsize, result["self.stat.memory.vsize"])
         self.assertEqual(rss, result["self.stat.memory.rss"])
         self.assertEqual(memory_percent, result["self.stat.memory.percent"])
+
+        # If the version of psutil doesn't have the C{get_process_io_counters},
+        # then io stats are not included in the output.
+        self.failIf("self.stat.io.count.read" in result)
+        self.failIf("self.stat.io.count.write" in result)
+        self.failIf("self.stat.io.bytes.read" in result)
+        self.failIf("self.stat.io.bytes.write" in result)
+
+
+    def test_self_statinfo_with_io_counters(self):
+        """
+        Process stat info is collected through psutil.
+
+        If C{get_process_io_counters} is implemented by the L{Process} object,
+        then io information will be returned with the process information.
+        """
+        process = psutil.Process(os.getpid())
+        vsize, rss = process.get_memory_info()
+        utime, stime = process.get_cpu_times()
+        cpu_percent = process.get_cpu_percent()
+        memory_percent = process.get_memory_percent(),
+        io_counters = (10, 42, 125, 16)
+
+        mock = self.mocker.mock()
+        self.expect(mock.get_memory_info()).result((vsize, rss))
+        self.expect(mock.get_cpu_times()).result((utime, stime))
+        self.expect(mock.get_cpu_percent()).result(cpu_percent)
+        self.expect(mock.get_memory_percent()).result(memory_percent)
+        self.expect(mock.get_process_io_counters).result(mock)
+        self.expect(mock.get_process_io_counters()).result(io_counters)
+        self.mocker.replay()
+
+        result = report_self_stat(process=mock)
+        self.assertEqual(10, result["self.stat.io.count.read"])
+        self.assertEqual(42, result["self.stat.io.count.write"])
+        self.assertEqual(125, result["self.stat.io.bytes.read"])
+        self.assertEqual(16, result["self.stat.io.bytes.write"])
