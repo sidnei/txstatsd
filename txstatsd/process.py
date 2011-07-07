@@ -1,4 +1,5 @@
 import os
+import socket
 import psutil
 
 from twisted.internet import defer, fdesc, error
@@ -107,11 +108,12 @@ def report_process_net_stats(process=psutil.Process(os.getpid()),
     if getattr(process, "get_connections", None) is not None:
         for connection in process.get_connections():
             fd, family, _type, laddr, raddr, status = connection
-            key = prefix + "status.%s" % status.lower()
-            if not key in result:
-                result[key] = 1
-            else:
-                result[key] += 1
+            if _type == socket.SOCK_STREAM:
+                key = prefix + "status.%s" % status.lower()
+                if not key in result:
+                    result[key] = 1
+                else:
+                    result[key] += 1
     return result
 
 
