@@ -55,6 +55,18 @@ class BaseMeter(object):
         raise NotImplementedError()
 
 
+class InProcessMeter(BaseMeter):
+    """A meter that can be used inside the C{StatsD} daemon itself."""
+
+    def __init__(self, processor, prefix="", sample_rate=1):
+        self.processor = processor
+        BaseMeter.__init__(self, prefix=prefix, sample_rate=sample_rate)
+
+    def write(self, data):
+        """Pass the data along directly to the C{Processor}."""
+        self.processor.process(data)
+
+
 class Meter(BaseMeter):
     """A trivial, non-Twisted-dependent meter."""
 

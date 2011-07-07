@@ -6,6 +6,7 @@ from twisted.python import usage, util
 
 from txstatsd.processor import MessageProcessor
 from txstatsd.protocol import GraphiteClientFactory, StatsDServerProtocol
+from txstatsd import process
 
 _unset = object()
 
@@ -73,13 +74,15 @@ class StatsDOptions(OptionsGlue):
     """
     glue_parameters = [
         ["carbon-cache-host", "h", "localhost",
-            "The host where carbon cache is listening."],
+         "The host where carbon cache is listening."],
         ["carbon-cache-port", "p", 2003,
-            "The port where carbon cache is listening.", int],
+         "The port where carbon cache is listening.", int],
         ["listen-port", "l", 8125,
-            "The UDP port where we will listen.", int],
+         "The UDP port where we will listen.", int],
         ["flush-interval", "i", 10000,
-            "The number of milliseconds between each flush.", int],
+         "The number of milliseconds between each flush.", int],
+        ["report", "r", None,
+         "Which additional stats to report {process|system}.", str],
     ]
 
 
@@ -90,7 +93,11 @@ def createService(options):
     service.setName("statsd")
     processor = MessageProcessor()
 
-    factory = GraphiteClientFactory(processor, options["flush-interval"])
+    report = None
+    if options["report"] is not None:
+        report = getattr(process, "%s_STATS" % options["report"].upper(), None)
+    factory = GraphiteClientFactory(
+        processor, options["flush-interval"], report)
     client = TCPClient(
         options["carbon-cache-host"], options["carbon-cache-port"],
         factory)

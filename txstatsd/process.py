@@ -1,6 +1,7 @@
 import os
 
 from twisted.internet import defer, fdesc, error
+from twisted.python import log
 
 
 MEMINFO_KEYS = ("MemTotal:", "MemFree:", "Buffers:",
@@ -11,6 +12,7 @@ SELF_STAT_POSITIONS = {"utime": 13,
                        "stime": 14,
                        "vsize": 22,
                        "rss": 23,
+                       "blkio_ticks": 41,
                        "gtime": 42}
 
 MULTIPLIERS = {"kB": 1024, "mB": 1024 * 1024}
@@ -106,3 +108,34 @@ def parse_loadavg(data, prefix="loadavg."):
          prefix + "fiveminutes",
          prefix + "fifthteenminutes"),
         [float(x) for x in data.split()[:3]]))
+
+
+PROCESS_STATS = (("/proc/self/stat", parse_self_stat),)
+
+SYSTEM_STATS = (("/proc/meminfo", parse_meminfo),
+                ("/proc/loadavg", parse_loadavg),
+                ("/proc/stat", parse_stat),) + PROCESS_STATS
+
+
+def send_metrics(metrics, meter):
+    """Put a dict of values in stats."""
+    for name, value in metrics.items():
+        meter.increment(name, value)
+
+
+def report_stats(stats, meter):
+    """
+    Read C{filename} then call C{function} to parse the contents, then report
+    to C{StatsD}.
+    """
+
+    deferreds = []
+    for filename, func in stats:
+        deferred = load_file(filename)
+        deferred.addCallback(func)
+        deferred.addCallback(send_metrics, meter)
+        deferred.addErrback(lambda failure: log.err(
+            failure, "Error while processing %s" % filename))
+        deferreds.append(deferred)
+
+    return defer.DeferredList(deferreds)
