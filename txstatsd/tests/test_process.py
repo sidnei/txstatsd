@@ -122,7 +122,7 @@ class TestSystemPerformance(TestCase, MockerTestCase):
         self.assertEqual(vsize, result["proc.memory.vsize"])
         self.assertEqual(rss, result["proc.memory.rss"])
         self.assertEqual(memory_percent, result["proc.memory.percent"])
-        self.assertEqual(1, result["proc.thread.count"])
+        self.assertEqual(1, result["proc.threads"])
 
     def test_ioinfo(self):
         """Process IO info is collected through psutil."""
@@ -133,10 +133,10 @@ class TestSystemPerformance(TestCase, MockerTestCase):
         # If the version of psutil doesn't have the C{get_io_counters},
         # then io stats are not included in the output.
         result = report_process_io_counters(process=mock)
-        self.failIf("proc.io.count.read" in result)
-        self.failIf("proc.io.count.write" in result)
-        self.failIf("proc.io.bytes.read" in result)
-        self.failIf("proc.io.bytes.write" in result)
+        self.failIf("proc.io.read.count" in result)
+        self.failIf("proc.io.write.count" in result)
+        self.failIf("proc.io.read.bytes" in result)
+        self.failIf("proc.io.write.bytes" in result)
 
     def test_ioinfo_with_get_io_counters(self):
         """
@@ -153,10 +153,10 @@ class TestSystemPerformance(TestCase, MockerTestCase):
         self.mocker.replay()
 
         result = report_process_io_counters(process=mock)
-        self.assertEqual(10, result["proc.io.count.read"])
-        self.assertEqual(42, result["proc.io.count.write"])
-        self.assertEqual(125, result["proc.io.bytes.read"])
-        self.assertEqual(16, result["proc.io.bytes.write"])
+        self.assertEqual(10, result["proc.io.read.count"])
+        self.assertEqual(42, result["proc.io.write.count"])
+        self.assertEqual(125, result["proc.io.read.bytes"])
+        self.assertEqual(16, result["proc.io.write.bytes"])
 
     def test_netinfo_no_get_connections(self):
         """

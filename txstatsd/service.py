@@ -82,7 +82,7 @@ class StatsDOptions(OptionsGlue):
         ["flush-interval", "i", 10000,
          "The number of milliseconds between each flush.", int],
         ["report", "r", None,
-         "Which additional stats to report {process|system}.", str],
+         "Which additional stats to report {process|net|io|system}.", str],
     ]
 
 
@@ -95,7 +95,11 @@ def createService(options):
 
     report = None
     if options["report"] is not None:
-        report = getattr(process, "%s_STATS" % options["report"].upper(), None)
+        report = ()
+        reports = [name.strip() for name in options["report"].split(",")]
+        for report_name in reports:
+            report = report + getattr(process, "%s_STATS" %
+                                      report_name.upper(), ())
     factory = GraphiteClientFactory(
         processor, options["flush-interval"], report)
     client = TCPClient(

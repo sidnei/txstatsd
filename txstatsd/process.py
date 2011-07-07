@@ -82,7 +82,7 @@ def report_process_memory_and_cpu(process=psutil.Process(os.getpid()),
               prefix + "memory.percent": process.get_memory_percent(),
               prefix + "memory.vsize": vsize,
               prefix + "memory.rss": rss,
-              prefix + "thread.count": process.get_num_threads()}
+              prefix + "threads": process.get_num_threads()}
     return result
 
 
@@ -94,10 +94,10 @@ def report_process_io_counters(process=psutil.Process(os.getpid()),
         (read_count, write_count,
          read_bytes, write_bytes) = process.get_io_counters()
         result.update({
-            prefix + "count.read": read_count,
-            prefix + "count.write": write_count,
-            prefix + "bytes.read": read_bytes,
-            prefix + "bytes.write": write_bytes})
+            prefix + "read.count": read_count,
+            prefix + "write.count": write_count,
+            prefix + "read.bytes": read_bytes,
+            prefix + "write.bytes": write_bytes})
     return result
 
 
