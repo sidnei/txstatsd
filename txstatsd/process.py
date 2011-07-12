@@ -82,8 +82,9 @@ def report_process_memory_and_cpu(process=psutil.Process(os.getpid()),
               prefix + ".cpu.system": stime,
               prefix + ".memory.percent": process.get_memory_percent(),
               prefix + ".memory.vsize": vsize,
-              prefix + ".memory.rss": rss,
-              prefix + ".threads": process.get_num_threads()}
+              prefix + ".memory.rss": rss}
+    if getattr(process, "get_num_threads", None) is not None:
+        result[prefix + ".threads"] = process.get_num_threads()
     return result
 
 

@@ -101,7 +101,43 @@ class TestSystemPerformance(TestCase, MockerTestCase):
         self.assertEqual(cpu_times.user, result["sys.cpu.user"])
 
     def test_self_statinfo(self):
-        """Process stat info is collected through psutil."""
+        """
+        Process stat info is collected through psutil.
+
+        If the L{Process} implementation does not have C{get_num_threads} then
+        the number of threads will not be included in the output.
+        """
+        process = psutil.Process(os.getpid())
+        vsize, rss = process.get_memory_info()
+        utime, stime = process.get_cpu_times()
+        cpu_percent = process.get_cpu_percent()
+        memory_percent = process.get_memory_percent()
+
+        mock = self.mocker.mock()
+        self.expect(mock.get_memory_info()).result((vsize, rss))
+        self.expect(mock.get_cpu_times()).result((utime, stime))
+        self.expect(mock.get_cpu_percent()).result(cpu_percent)
+        self.expect(mock.get_memory_percent()).result(memory_percent)
+        self.expect(mock.get_num_threads).result(None)
+        self.mocker.replay()
+
+        result = report_process_memory_and_cpu(process=mock)
+        self.assertEqual(utime, result["proc.cpu.user"])
+        self.assertEqual(stime, result["proc.cpu.system"])
+        self.assertEqual(cpu_percent, result["proc.cpu.percent"])
+        self.assertEqual(vsize, result["proc.memory.vsize"])
+        self.assertEqual(rss, result["proc.memory.rss"])
+        self.assertEqual(memory_percent, result["proc.memory.percent"])
+        self.failIf("proc.threads" in result)
+
+    def test_self_statinfo_with_num_threads(self):
+        """
+        Process stat info is collected through psutil.
+
+        If the L{Process} implementation contains C{get_num_threads} then the
+        number of threads will be included in the output.
+
+        """
         process = psutil.Process(os.getpid())
         vsize, rss = process.get_memory_info()
         utime, stime = process.get_cpu_times()
