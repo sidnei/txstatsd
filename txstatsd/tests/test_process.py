@@ -227,4 +227,4 @@ class TestSystemPerformance(TestCase, MockerTestCase):
         self.assertEqual(42, result["threadpool.queue"])
         self.assertEqual(6, result["threadpool.threads"])
         self.assertEqual(2, result["threadpool.waiters"])
-        self.assertEqual(4, result["threadpool.workers"])
+        self.assertEqual(4, result["threadpool.working"])

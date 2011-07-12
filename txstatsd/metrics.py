@@ -130,12 +130,22 @@ class TransportMeter(BaseMeter):
     host = None
     port = None
 
-    def connected(self, transport, host, port):
+    def __init__(self, prefix="", sample_rate=1,
+                 connect_callback=None, disconnect_callback=None):
+        self.connect_callback = connect_callback
+        self.disconnect_callback = disconnect_callback
+        BaseMeter.__init__(self, prefix=prefix, sample_rate=sample_rate)
+
+    def connect(self, transport, host, port):
         self.transport = transport
         self.host = host
         self.port = port
+        if self.connect_callback is not None:
+            self.connect_callback()
 
-    def disconnected(self):
+    def disconnect(self):
+        if self.disconnect_callback is not None:
+            self.disconnect_callback()
         self.transport = self.host = self.port = None
 
     def write(self, data):

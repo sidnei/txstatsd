@@ -1,14 +1,10 @@
 import logging
-import socket
 
 from twisted.python import log
 from twisted.internet import task, defer
 from twisted.protocols.basic import LineOnlyReceiver
 from twisted.internet.protocol import (
     DatagramProtocol, ReconnectingClientFactory)
-
-from txstatsd.metrics import InProcessMeter
-from txstatsd.process import report_stats
 
 
 class StatsDServerProtocol(DatagramProtocol):
@@ -34,29 +30,19 @@ class StatsDClientProtocol(DatagramProtocol):
     Data is sent via UDP to a StatsD server for aggregation.
     """
 
-    def __init__(self, host, port, meter, report=None, interval=None):
+    def __init__(self, host, port, meter, interval=None):
         self.host = host
         self.port = port
         self.meter = meter
-        self.report = report
         self.interval = interval
-        if self.report is not None:
-            self.report_task = task.LoopingCall(
-                report_stats, self.report, self.meter)
-        else:
-            self.report_task = None
 
     def startProtocol(self):
         """Connect to destination host."""
-        self.meter.connected(self.transport, self.host, self.port)
-        if self.report_task is not None:
-            self.report_task.start(self.interval / 1000, False)
+        self.meter.connect(self.transport, self.host, self.port)
 
     def stopProtocol(self):
         """Connection was lost."""
-        if self.report_task is not None:
-            self.report_task.stop()
-        self.meter.disconnected()
+        self.meter.disconnect()
 
 
 class GraphiteProtocol(LineOnlyReceiver):
@@ -67,12 +53,9 @@ class GraphiteProtocol(LineOnlyReceiver):
 
     delimiter = "\n"
 
-    def __init__(self, processor, interval, report=None):
+    def __init__(self, processor, interval):
         self.processor = processor
         self.interval = interval
-        self.meter = InProcessMeter(self.processor,
-                                    prefix=socket.gethostname() + ".statsd")
-        self.report = report
         self.flush_task = None
 
     def connectionMade(self):
@@ -98,8 +81,6 @@ class GraphiteProtocol(LineOnlyReceiver):
     @defer.inlineCallbacks
     def flushProcessor(self):
         """Flush messages queued in the processor to Graphite."""
-        if self.report is not None:
-            yield report_stats(self.report, self.meter)
         for message in self.processor.flush(interval=self.interval):
             for line in message.splitlines():
                 yield self.sendLine(line)
@@ -108,10 +89,9 @@ class GraphiteProtocol(LineOnlyReceiver):
 class GraphiteClientFactory(ReconnectingClientFactory):
     """A reconnecting Graphite client."""
 
-    def __init__(self, processor, interval, report=None):
+    def __init__(self, processor, interval):
         self.processor = processor
         self.interval = interval
-        self.report = report
 
     def buildProtocol(self, addr):
         """
@@ -119,6 +99,6 @@ class GraphiteClientFactory(ReconnectingClientFactory):
         L{MessageProcessor}.
         """
         self.resetDelay()
-        protocol = GraphiteProtocol(self.processor, self.interval, self.report)
+        protocol = GraphiteProtocol(self.processor, self.interval)
         protocol.factory = self
         return protocol
