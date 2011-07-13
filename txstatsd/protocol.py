@@ -1,6 +1,3 @@
-import logging
-
-from twisted.python import log
 from twisted.internet import task, defer
 from twisted.protocols.basic import LineOnlyReceiver
 from twisted.internet.protocol import (
@@ -19,8 +16,6 @@ class StatsDServerProtocol(DatagramProtocol):
 
     def datagramReceived(self, data, (host, port)):
         """Process received data and store it locally."""
-        log.msg("Received data from %s:%d" % (host, port),
-                logLevel=logging.DEBUG)
         self.processor.process(data)
 
 
@@ -56,34 +51,17 @@ class GraphiteProtocol(LineOnlyReceiver):
     def __init__(self, processor, interval):
         self.processor = processor
         self.interval = interval
-        self.flush_task = None
-
-    def connectionMade(self):
-        """
-        Once a connection has been made, schedule a L{MessageProcessor.flush}
-        call to happen some time in the future.
-        """
-        log.msg("Connected. Scheduling flush to now + %ds." %
-                (self.interval / 1000), logLevel=logging.DEBUG)
         self.flush_task = task.LoopingCall(self.flushProcessor)
         self.flush_task.start(self.interval / 1000, False)
-
-    def connectionLost(self, reason):
-        """
-        If the connection has been lost, cancel scheduled calls to
-        L{MessageProcessor.flush} until the connection is restored.
-        """
-        log.msg("Connection lost.", logLevel=logging.DEBUG)
-        if self.flush_task is not None:
-            log.msg("Canceling scheduled flush.", logLevel=logging.DEBUG)
-            self.flush_task.stop()
 
     @defer.inlineCallbacks
     def flushProcessor(self):
         """Flush messages queued in the processor to Graphite."""
         for message in self.processor.flush(interval=self.interval):
             for line in message.splitlines():
-                yield self.sendLine(line)
+                if self.connected:
+                    self.sendLine(line)
+                yield
 
 
 class GraphiteClientFactory(ReconnectingClientFactory):

@@ -74,8 +74,7 @@ def parse_loadavg(data, prefix="sys.loadavg"):
 class ProcessReport(object):
 
     def __init__(self, process=None):
-        if process is not None:
-            self._process = process
+        self._process = process
 
     @property
     def process(self):
