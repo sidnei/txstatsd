@@ -4,6 +4,5 @@ from txstatsd import service
 
 application = Application("statsd")
 
-statsd_service = service.createService(service.StatsdOptions())
+statsd_service = service.createService(service.StatsDOptions())
 statsd_service.setServiceParent(application)
-

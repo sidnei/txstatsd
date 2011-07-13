@@ -1,11 +1,16 @@
+import socket
 import ConfigParser
 
 from twisted.application.internet import TCPClient, UDPServer
 from twisted.application.service import MultiService
+from twisted.internet import reactor
 from twisted.python import usage, util
 
+from txstatsd import process
+from txstatsd.metrics import InProcessMeter
 from txstatsd.processor import MessageProcessor
 from txstatsd.protocol import GraphiteClientFactory, StatsDServerProtocol
+from txstatsd.report import ReportingService
 
 _unset = object()
 
@@ -73,13 +78,17 @@ class StatsDOptions(OptionsGlue):
     """
     glue_parameters = [
         ["carbon-cache-host", "h", "localhost",
-            "The host where carbon cache is listening."],
+         "The host where carbon cache is listening."],
         ["carbon-cache-port", "p", 2003,
-            "The port where carbon cache is listening.", int],
+         "The port where carbon cache is listening.", int],
         ["listen-port", "l", 8125,
-            "The UDP port where we will listen.", int],
+         "The UDP port where we will listen.", int],
         ["flush-interval", "i", 10000,
-            "The number of milliseconds between each flush.", int],
+         "The number of milliseconds between each flush.", int],
+        ["prefix", "p", None,
+         "Prefix to use when reporting stats.", str],
+        ["report", "r", None,
+         "Which additional stats to report {process|net|io|system}.", str],
     ]
 
 
@@ -89,11 +98,27 @@ def createService(options):
     service = MultiService()
     service.setName("statsd")
     processor = MessageProcessor()
+    prefix = options["prefix"]
+    if prefix is None:
+        prefix = socket.gethostname() + ".statsd"
+
+    meter = InProcessMeter(processor, prefix=prefix)
+
+    if options["report"] is not None:
+        reporting = ReportingService()
+        reporting.setServiceParent(service)
+        reporting.schedule(
+            process.report_reactor_stats(reactor), 10, meter.increment)
+        reports = [name.strip() for name in options["report"].split(",")]
+        for report_name in reports:
+            for reporter in getattr(process, "%s_STATS" %
+                                    report_name.upper(), ()):
+                reporting.schedule(reporter, 10, meter.increment)
 
     factory = GraphiteClientFactory(processor, options["flush-interval"])
-    client = TCPClient(
-        options["carbon-cache-host"], options["carbon-cache-port"],
-        factory)
+    client = TCPClient(options["carbon-cache-host"],
+                       options["carbon-cache-port"],
+                       factory)
     client.setServiceParent(service)
 
     listener = UDPServer(options["listen-port"],

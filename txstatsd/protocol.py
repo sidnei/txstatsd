@@ -1,7 +1,7 @@
 import logging
 
 from twisted.python import log
-from twisted.internet import task
+from twisted.internet import task, defer
 from twisted.protocols.basic import LineOnlyReceiver
 from twisted.internet.protocol import (
     DatagramProtocol, ReconnectingClientFactory)
@@ -27,21 +27,22 @@ class StatsDServerProtocol(DatagramProtocol):
 class StatsDClientProtocol(DatagramProtocol):
     """A Twisted-based implementation of the StatsD client protocol.
 
-    Data is sent via ConnectedUDP to a StatsD server for aggregation.
+    Data is sent via UDP to a StatsD server for aggregation.
     """
 
-    def __init__(self, host, port, meter):
+    def __init__(self, host, port, meter, interval=None):
         self.host = host
         self.port = port
         self.meter = meter
+        self.interval = interval
 
     def startProtocol(self):
         """Connect to destination host."""
-        self.meter.connected(self.transport, self.host, self.port)
+        self.meter.connect(self.transport, self.host, self.port)
 
     def stopProtocol(self):
         """Connection was lost."""
-        self.meter.disconnected()
+        self.meter.disconnect()
 
 
 class GraphiteProtocol(LineOnlyReceiver):
@@ -65,7 +66,7 @@ class GraphiteProtocol(LineOnlyReceiver):
         log.msg("Connected. Scheduling flush to now + %ds." %
                 (self.interval / 1000), logLevel=logging.DEBUG)
         self.flush_task = task.LoopingCall(self.flushProcessor)
-        self.flush_task.start(self.interval / 1000)
+        self.flush_task.start(self.interval / 1000, False)
 
     def connectionLost(self, reason):
         """
@@ -77,12 +78,12 @@ class GraphiteProtocol(LineOnlyReceiver):
             log.msg("Canceling scheduled flush.", logLevel=logging.DEBUG)
             self.flush_task.stop()
 
+    @defer.inlineCallbacks
     def flushProcessor(self):
         """Flush messages queued in the processor to Graphite."""
-        log.msg("Flushing messages.", logLevel=logging.DEBUG)
         for message in self.processor.flush(interval=self.interval):
             for line in message.splitlines():
-                self.sendLine(line)
+                yield self.sendLine(line)
 
 
 class GraphiteClientFactory(ReconnectingClientFactory):

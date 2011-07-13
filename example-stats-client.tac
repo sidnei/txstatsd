@@ -8,11 +8,18 @@ from twisted.application.service import Application
 
 from txstatsd.protocol import StatsDClientProtocol
 from txstatsd.metrics import TransportMeter
+from txstatsd.process import PROCESS_STATS
+from txstatsd.report import ReportingService
 
 
 application = Application("example-stats-client")
-meter = TransportMeter(prefix=socket.gethostname())
+meter = TransportMeter(prefix=socket.gethostname() + ".example-client")
 
+reporting = ReportingService()
+reporting.setServiceParent(application)
+
+for report in PROCESS_STATS:
+    reporting.schedule(report, 10, meter.increment)
 
 def random_walker(name):
     """Meters a random walk."""
@@ -35,5 +42,5 @@ for n in range(5):
     t.start(0.5, now=False)
 
 
-protocol = StatsDClientProtocol("127.0.0.1", 8125, meter)
+protocol = StatsDClientProtocol("127.0.0.1", 8125, meter, 6000)
 reactor.listenUDP(0, protocol)
