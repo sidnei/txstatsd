@@ -6,10 +6,8 @@ from twisted.internet import defer
 from twisted.trial.unittest import TestCase
 
 from txstatsd.process import (
-    load_file, parse_meminfo, parse_loadavg,
-    report_process_memory_and_cpu, report_process_io_counters,
-    report_process_net_stats, report_system_stats,
-    report_reactor_stats, report_threadpool_stats)
+    ProcessReport, load_file, parse_meminfo, parse_loadavg,
+    report_system_stats, report_reactor_stats, report_threadpool_stats)
 
 
 meminfo = """\
@@ -121,7 +119,7 @@ class TestSystemPerformance(TestCase, MockerTestCase):
         self.expect(mock.get_num_threads).result(None)
         self.mocker.replay()
 
-        result = report_process_memory_and_cpu(process=mock)
+        result = ProcessReport(process=mock).get_memory_and_cpu()
         self.assertEqual(utime, result["proc.cpu.user"])
         self.assertEqual(stime, result["proc.cpu.system"])
         self.assertEqual(cpu_percent, result["proc.cpu.percent"])
@@ -152,7 +150,7 @@ class TestSystemPerformance(TestCase, MockerTestCase):
         self.expect(mock.get_num_threads()).result(1)
         self.mocker.replay()
 
-        result = report_process_memory_and_cpu(process=mock)
+        result = ProcessReport(process=mock).get_memory_and_cpu()
         self.assertEqual(utime, result["proc.cpu.user"])
         self.assertEqual(stime, result["proc.cpu.system"])
         self.assertEqual(cpu_percent, result["proc.cpu.percent"])
@@ -169,7 +167,7 @@ class TestSystemPerformance(TestCase, MockerTestCase):
 
         # If the version of psutil doesn't have the C{get_io_counters},
         # then io stats are not included in the output.
-        result = report_process_io_counters(process=mock)
+        result = ProcessReport(process=mock).get_io_counters()
         self.failIf("proc.io.read.count" in result)
         self.failIf("proc.io.write.count" in result)
         self.failIf("proc.io.read.bytes" in result)
@@ -189,7 +187,7 @@ class TestSystemPerformance(TestCase, MockerTestCase):
         self.expect(mock.get_io_counters()).result(io_counters)
         self.mocker.replay()
 
-        result = report_process_io_counters(process=mock)
+        result = ProcessReport(process=mock).get_io_counters()
         self.assertEqual(10, result["proc.io.read.count"])
         self.assertEqual(42, result["proc.io.write.count"])
         self.assertEqual(125, result["proc.io.read.bytes"])
@@ -208,7 +206,7 @@ class TestSystemPerformance(TestCase, MockerTestCase):
 
         # If the version of psutil doesn't have the C{get_io_counters},
         # then io stats are not included in the output.
-        result = report_process_net_stats(process=mock)
+        result = ProcessReport(process=mock).get_net_stats()
         self.failIf("proc.net.status.established" in result)
 
     def test_netinfo_with_get_connections(self):
@@ -234,7 +232,7 @@ class TestSystemPerformance(TestCase, MockerTestCase):
         self.expect(mock.get_connections()).result(connections)
         self.mocker.replay()
 
-        result = report_process_net_stats(process=mock)
+        result = ProcessReport(process=mock).get_net_stats()
         self.assertEqual(2, result["proc.net.status.established"])
         self.assertEqual(1, result["proc.net.status.closing"])
         self.assertEqual(1, result["proc.net.status.syn_sent"])
