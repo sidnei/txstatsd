@@ -48,7 +48,7 @@ class TwistedStatsDClient(object):
     def connect(self, transport=None):
         """Connect to the StatsD server."""
         self.transport = transport
-        if self.transport is not None:           
+        if self.transport is not None:
             if self.connect_callback is not None:
                 self.connect_callback()
 
@@ -112,4 +112,3 @@ class InternalClient(object):
     def write(self, data):
         """Write directly to the C{MessageProcessor}."""
         self._processor.process(data)
-

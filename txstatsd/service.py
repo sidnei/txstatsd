@@ -9,8 +9,8 @@ from twisted.python import usage, util
 from txstatsd import process
 from txstatsd.client import InternalClient
 from txstatsd.metrics.metrics import Metrics
-from txstatsd.processor import MessageProcessor
-from txstatsd.protocol import GraphiteClientFactory, StatsDServerProtocol
+from txstatsd.server.processor import MessageProcessor
+from txstatsd.server.protocol import GraphiteClientFactory, StatsDServerProtocol
 from txstatsd.report import ReportingService
 
 _unset = object()
@@ -110,7 +110,7 @@ def createService(options):
         reporting = ReportingService()
         reporting.setServiceParent(service)
         reporting.schedule(
-            process.report_reactor_stats(reactor), 10, meter.increment)
+            process.report_reactor_stats(reactor), 10, metrics.increment)
         reports = [name.strip() for name in options["report"].split(",")]
         for report_name in reports:
             for reporter in getattr(process, "%s_STATS" %

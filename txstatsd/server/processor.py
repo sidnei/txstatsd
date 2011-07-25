@@ -105,8 +105,7 @@ class MessageProcessor(object):
             return self.fail(message)
 
         try:
-            metric = [float(v) for v in values]
-            metric.append(key)
+            metric = [float(values[0]), key]
             self.gauge_metrics.append(metric)
         except (TypeError, ValueError):
             self.fail(message)
@@ -121,7 +120,8 @@ class MessageProcessor(object):
         interval = interval / 1000
         timestamp = int(self.time_function())
 
-        counter_metrics, events = self.flush_counter_metrics(interval, timestamp)
+        counter_metrics, events = self.flush_counter_metrics(interval,
+                                                             timestamp)
         if events > 0:
             messages.extend(counter_metrics)
             num_stats += events
