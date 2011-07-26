@@ -1,72 +1,60 @@
-"""Tests for metrics context manager."""
+"""Tests for the Metrics convenience class."""
 
-from mocker import ANY, MockerTestCase
-from txstatsd.metrics import Measure
+from unittest import TestCase
+
+from txstatsd.metrics.metrics import Metrics
 
 
-class MeasureTest(MockerTestCase):
-    """Test case for the L{Measure} context manager."""
+class FakeStatsDClient(object):
 
-    def test_measure(self):
-        """Basic test."""
-        operation_name = 'fake_function'
-        meter = self.mocker.mock()
-        meter.increment(operation_name)
-        meter.timing(operation_name, ANY)
-        meter.increment(operation_name + '.done')
-        meter.decrement(operation_name)
-        self.mocker.replay()
-        result = []
+    def connect(self):
+        """Connect to the StatsD server."""
+        pass
 
-        def fake_function():
-            """Useles method."""
-            result.append(0)
+    def disconnect(self):
+        """Disconnect from the StatsD server."""
+        pass
 
-        with Measure('test_prefix', 'fake_function', meter):
-            fake_function()
-        self.assertEqual([0], result)
+    def write(self, data):
+        """Send the metric to the StatsD server."""
+        self.data = data
 
-    def test_measure_timing(self):
-        """Test the timing works."""
-        operation_name = 'fake_function'
-        MockTime = self.mocker.replace('time.time')  # pylint: disable=C0103
-        self.expect(MockTime()).result(10)
-        self.expect(MockTime()).result(15)
-        meter = self.mocker.mock()
-        meter.increment(operation_name)
-        meter.timing(operation_name, 5)
-        meter.increment(operation_name + '.done')
-        meter.decrement(operation_name)
-        self.mocker.replay()
 
-        def fake_function():
-            """Useless method."""
+class TestMetrics(TestCase):
 
-        with Measure('test_prefix', 'fake_function', meter):
-            fake_function()
+    def setUp(self):
+        self.connection = FakeStatsDClient()
+        self.metrics = Metrics(self.connection, 'txstatsd.tests')
 
-    def test_measure_handle_exceptions(self):
-        """Test exceptions."""
+    def test_gauge(self):
+        """Test reporting of a gauge metric sample."""
+        self.metrics.gauge('gauge', 102)
+        self.assertEqual(self.connection.data,
+                         'txstatsd.tests.gauge:102|g')
 
-        class TestException(Exception):
-            """Exception used to test the wrapper."""
-            pass
+    def test_counter(self):
+        """Test the increment and decrement operations."""
+        self.metrics.increment('counter', 18)
+        self.assertEqual(self.connection.data,
+                         'txstatsd.tests.counter:18|c')
+        self.metrics.decrement('counter', 9)
+        self.assertEqual(self.connection.data,
+                         'txstatsd.tests.counter:-9|c')
 
-        operation_name = 'fake_function'
-        meter = self.mocker.mock()
-        meter.increment(operation_name)
-        meter.increment(operation_name + '.error')
-        meter.decrement(operation_name)
-        self.mocker.replay()
+    def test_timing(self):
+        """Test the timing operation."""
+        self.metrics.timing('timing', 101123)
+        self.assertEqual(self.connection.data,
+                         'txstatsd.tests.timing:101123|ms')
 
-        def fake_function():
-            """Fake Method that raises an exception."""
-            raise TestException()
+    def test_empty_namespace(self):
+        """Test reporting of an empty namespace."""
+        self.metrics.namespace = None
+        self.metrics.gauge('gauge', 213)
+        self.assertEqual(self.connection.data,
+                         'gauge:213|g')
 
-        try:
-            with Measure('test_prefix', 'fake_function', meter):
-                fake_function()
-        except TestException:
-            self.assertTrue(True)
-        else:
-            self.fail('measure context manager did not reraise exception.')
+        self.metrics.namespace = ''
+        self.metrics.gauge('gauge', 413)
+        self.assertEqual(self.connection.data,
+                         'gauge:413|g')

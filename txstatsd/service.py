@@ -7,9 +7,10 @@ from twisted.internet import reactor
 from twisted.python import usage, util
 
 from txstatsd import process
-from txstatsd.metrics import InProcessMeter
-from txstatsd.processor import MessageProcessor
-from txstatsd.protocol import GraphiteClientFactory, StatsDServerProtocol
+from txstatsd.client import InternalClient
+from txstatsd.metrics.metrics import Metrics
+from txstatsd.server.processor import MessageProcessor
+from txstatsd.server.protocol import GraphiteClientFactory, StatsDServerProtocol
 from txstatsd.report import ReportingService
 
 _unset = object()
@@ -102,18 +103,19 @@ def createService(options):
     if prefix is None:
         prefix = socket.gethostname() + ".statsd"
 
-    meter = InProcessMeter(processor, prefix=prefix)
+    connection = InternalClient(processor)
+    metrics = Metrics(connection, namespace=prefix)
 
     if options["report"] is not None:
         reporting = ReportingService()
         reporting.setServiceParent(service)
         reporting.schedule(
-            process.report_reactor_stats(reactor), 10, meter.increment)
+            process.report_reactor_stats(reactor), 10, metrics.increment)
         reports = [name.strip() for name in options["report"].split(",")]
         for report_name in reports:
             for reporter in getattr(process, "%s_STATS" %
                                     report_name.upper(), ()):
-                reporting.schedule(reporter, 10, meter.increment)
+                reporting.schedule(reporter, 10, metrics.increment)
 
     factory = GraphiteClientFactory(processor, options["flush-interval"])
     client = TCPClient(options["carbon-cache-host"],
