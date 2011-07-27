@@ -110,12 +110,12 @@ def createService(options):
         reporting = ReportingService()
         reporting.setServiceParent(service)
         reporting.schedule(
-            process.report_reactor_stats(reactor), 10, metrics.increment)
+            process.report_reactor_stats(reactor), 10, metrics.gauge)
         reports = [name.strip() for name in options["report"].split(",")]
         for report_name in reports:
             for reporter in getattr(process, "%s_STATS" %
                                     report_name.upper(), ()):
-                reporting.schedule(reporter, 10, metrics.increment)
+                reporting.schedule(reporter, 10, metrics.gauge)
 
     factory = GraphiteClientFactory(processor, options["flush-interval"])
     client = TCPClient(options["carbon-cache-host"],
