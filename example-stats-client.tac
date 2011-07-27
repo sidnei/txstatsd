@@ -25,7 +25,7 @@ reporting = ReportingService()
 reporting.setServiceParent(application)
 
 for report in PROCESS_STATS:
-    reporting.schedule(report, 10, meter.increment)
+    reporting.schedule(report, 10, metrics.increment)
 
 def random_walker(name):
     """Meters a random walk."""
@@ -48,6 +48,5 @@ for n in range(5):
     t.start(0.5, now=False)
 
 
-protocol = StatsDClientProtocol(STATSD_HOST, STATSD_PORT,
-                                statsd_client, 6000)
+protocol = StatsDClientProtocol(statsd_client)
 reactor.listenUDP(0, protocol)

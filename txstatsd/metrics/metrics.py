@@ -28,7 +28,7 @@ class Metrics(object):
             self._metrics[name] = gauge_metric
         self._metrics[name].mark(value)
 
-    def increment(self, name, value, sample_rate=1):
+    def increment(self, name, value=1, sample_rate=1):
         """Report and increase in name by count."""
         name = self.fully_qualify_name(name)
         if not name in self._metrics:
@@ -38,7 +38,7 @@ class Metrics(object):
             self._metrics[name] = metric
         self._metrics[name].send("%s|c" % value)
 
-    def decrement(self, name, value, sample_rate=1):
+    def decrement(self, name, value=1, sample_rate=1):
         """Report and decrease in name by count."""
         name = self.fully_qualify_name(name)
         if not name in self._metrics:

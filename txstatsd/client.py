@@ -1,4 +1,3 @@
-
 import socket
 
 from twisted.internet.protocol import DatagramProtocol
@@ -10,11 +9,8 @@ class StatsDClientProtocol(DatagramProtocol):
     Data is sent via UDP to a StatsD server for aggregation.
     """
 
-    def __init__(self, host, port, client, interval=None):
-        self.host = host
-        self.port = port
+    def __init__(self, client):
         self.client = client
-        self.interval = interval
 
     def startProtocol(self):
         """Connect to destination host."""
@@ -27,10 +23,11 @@ class StatsDClientProtocol(DatagramProtocol):
 
 class TwistedStatsDClient(object):
 
-    def __init__(self, host, port,
-                 connect_callback=None, disconnect_callback=None):
-        """Build a connection that reports to the endpoint (on
-        C{host} and C{port}) using UDP.
+    def __init__(self, host, port, connect_callback=None,
+                 disconnect_callback=None):
+        """
+        Build a connection that reports to the endpoint (on C{host} and
+        C{port}) using UDP.
 
         @param host: The StatsD server host.
         @param port: The StatsD server port.
@@ -56,7 +53,7 @@ class TwistedStatsDClient(object):
         """Disconnect from the StatsD server."""
         if self.disconnect_callback is not None:
             self.disconnect_callback()
-        self.transport = self.host = self.port = None
+        self.transport = None
 
     def write(self, data):
         """Send the metric to the StatsD server."""
@@ -102,12 +99,6 @@ class InternalClient(object):
         A connection that writes directly to the C{MessageProcessor}.
         """
         self._processor = processor
-
-    def connect(self):
-        pass
-
-    def disconnect(self):
-        pass
 
     def write(self, data):
         """Write directly to the C{MessageProcessor}."""
