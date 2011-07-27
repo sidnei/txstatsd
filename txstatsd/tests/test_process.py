@@ -1,5 +1,6 @@
 import os
 import psutil
+import sys
 
 from mocker import MockerTestCase
 from twisted.internet import defer
@@ -91,12 +92,27 @@ class TestSystemPerformance(TestCase, MockerTestCase):
         self.mocker.replay()
 
         result = report_system_stats()
-        self.assertEqual(cpu_times.idle, result["sys.cpu.idle"])
-        self.assertEqual(cpu_times.iowait, result["sys.cpu.iowait"])
-        self.assertEqual(cpu_times.irq, result["sys.cpu.irq"])
-        self.assertEqual(cpu_times.nice, result["sys.cpu.nice"])
-        self.assertEqual(cpu_times.system, result["sys.cpu.system"])
-        self.assertEqual(cpu_times.user, result["sys.cpu.user"])
+        # cpu_times is platform-dependent
+        if sys.platform.lower().startswith("linux"):
+            self.assertEqual(cpu_times.user, result["sys.cpu.user"])
+            self.assertEqual(cpu_times.system, result["sys.cpu.system"])
+            self.assertEqual(cpu_times.idle, result["sys.cpu.idle"])
+            self.assertEqual(cpu_times.iowait, result["sys.cpu.iowait"])
+            self.assertEqual(cpu_times.irq, result["sys.cpu.irq"])
+        elif sys.platform.lower().startswith("win32"):
+            self.assertEqual(cpu_times.user, result["sys.cpu.user"])
+            self.assertEqual(cpu_times.system, result["sys.cpu.system"])
+            self.assertEqual(cpu_times.idle, result["sys.cpu.idle"])
+        elif sys.platform.lower().startswith("darwin"):
+            self.assertEqual(cpu_times.user, result["sys.cpu.user"])
+            self.assertEqual(cpu_times.system, result["sys.cpu.system"])
+            self.assertEqual(cpu_times.idle, result["sys.cpu.idle"])
+            self.assertEqual(cpu_times.nice, result["sys.cpu.nice"])
+        elif sys.platform.lower().startswith("freebsd"):
+            self.assertEqual(cpu_times.user, result["sys.cpu.user"])
+            self.assertEqual(cpu_times.system, result["sys.cpu.system"])
+            self.assertEqual(cpu_times.idle, result["sys.cpu.idle"])
+            self.assertEqual(cpu_times.irq, result["sys.cpu.irq"])
 
     def test_self_statinfo(self):
         """
