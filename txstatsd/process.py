@@ -134,13 +134,11 @@ report_process_net_stats = process_report.get_net_stats
 
 
 def report_system_stats(prefix="sys"):
-    cpu_times = psutil.cpu_times()
-    return {prefix + ".cpu.idle": cpu_times.idle,
-            prefix + ".cpu.iowait": cpu_times.iowait,
-            prefix + ".cpu.irq": cpu_times.irq,
-            prefix + ".cpu.nice": cpu_times.nice,
-            prefix + ".cpu.system": cpu_times.system,
-            prefix + ".cpu.user": cpu_times.user}
+    cpu_times = psutil.cpu_times()._asdict()
+    system_stats = {}
+    for mode, time in cpu_times.iteritems():
+        system_stats[prefix + ".cpu." + mode] = time
+    return system_stats
 
 
 def report_threadpool_stats(threadpool, prefix="threadpool"):
