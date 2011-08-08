@@ -7,7 +7,7 @@ from twisted.internet import defer
 from twisted.trial.unittest import TestCase
 
 from txstatsd.process import (
-    ProcessReport, load_file, parse_meminfo, parse_loadavg,
+    ProcessReport, load_file, parse_meminfo, parse_loadavg, parse_netdev,
     report_system_stats, report_reactor_stats, report_threadpool_stats)
 
 
@@ -53,6 +53,13 @@ HugePages_Surp:        0
 Hugepagesize:       2048 kB
 DirectMap4k:     7968640 kB
 DirectMap2M:      415744 kB"""
+
+
+netdev = """Inter-|   Receive                                                |  Transmit
+ face |bytes    packets errs drop fifo frame compressed multicast|bytes    packets errs drop fifo colls carrier compressed
+lo: 635698677 2126380    0    0    0     0          0         0 635698677 2126380    0    0    0     0       0          0
+eth0: 206594440  189319    0    0    0     0          0         0 23357088  165086    0    0    0     0       0          0
+tun0: 5138313   24837    0    0    0     0          0         0  5226635   26986    0    0    0     0       0          0"""
 
 
 class TestSystemPerformance(TestCase, MockerTestCase):
@@ -278,3 +285,22 @@ class TestSystemPerformance(TestCase, MockerTestCase):
         self.assertEqual(6, result["threadpool.threads"])
         self.assertEqual(2, result["threadpool.waiters"])
         self.assertEqual(4, result["threadpool.working"])
+
+    def test_netdev(self):
+        """
+        C{parse_netdev} returns a stat for sent/received bytes and packets for
+        each network interfaces.
+        """
+        self.assertEqual(parse_netdev(netdev), {
+            "sys.net.lo.bytes.received": 635698677,
+            "sys.net.lo.bytes.sent": 635698677,
+            "sys.net.lo.packets.received": 2126380,
+            "sys.net.lo.packets.sent": 2126380,
+            "sys.net.eth0.bytes.received": 206594440,
+            "sys.net.eth0.bytes.sent": 23357088,
+            "sys.net.eth0.packets.received": 189319,
+            "sys.net.eth0.packets.sent": 165086,
+            "sys.net.tun0.bytes.received": 5138313,
+            "sys.net.tun0.bytes.sent": 5226635,
+            "sys.net.tun0.packets.received": 24837,
+            "sys.net.tun0.packets.sent": 26986})

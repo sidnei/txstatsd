@@ -71,6 +71,30 @@ def parse_loadavg(data, prefix="sys.loadavg"):
         [float(x) for x in data.split()[:3]]))
 
 
+def parse_netdev(data, prefix="sys.net"):
+    """Parse data from /proc/net/dev."""
+    lines = data.splitlines()
+    # Parse out the column headers as keys.
+    _, receive_columns, transmit_columns = lines[1].split("|")
+    columns = ["recv_%s" % column for column in receive_columns.split()]
+    columns.extend(["send_%s" % column for column in transmit_columns.split()])
+
+    # Parse out the network devices.
+    result = {}
+    for line in lines[2:]:
+        if not ":" in line:
+            continue
+        device, data = line.split(":")
+        device = device.strip()
+        data = dict(zip(columns, map(int, data.split())))
+        result.update({
+            "%s.%s.bytes.received" % (prefix, device): data["recv_bytes"],
+            "%s.%s.bytes.sent" % (prefix, device): data["send_bytes"],
+            "%s.%s.packets.received" % (prefix, device): data["recv_packets"],
+            "%s.%s.packets.sent" % (prefix, device): data["send_packets"]})
+    return result
+
+
 class ProcessReport(object):
 
     def __init__(self, process=None):
@@ -97,7 +121,6 @@ class ProcessReport(object):
             result[prefix + ".threads"] = self.process.get_num_threads()
         return result
 
-
     def get_io_counters(self, prefix="proc.io"):
         """Report IO statistics for C{process}."""
         result = {}
@@ -110,7 +133,6 @@ class ProcessReport(object):
                 prefix + ".read.bytes": read_bytes,
                 prefix + ".write.bytes": write_bytes})
         return result
-
 
     def get_net_stats(self, prefix="proc.net"):
         """Report active connection statistics for C{process}."""
@@ -180,4 +202,5 @@ NET_STATS = (report_process_net_stats,)
 
 SYSTEM_STATS = (report_file_stats("/proc/meminfo", parse_meminfo),
                 report_file_stats("/proc/loadavg", parse_loadavg),
+                report_file_stats("/proc/net/dev", parse_netdev),
                 report_system_stats)
