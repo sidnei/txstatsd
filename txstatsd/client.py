@@ -35,6 +35,10 @@ class TwistedStatsDClient(object):
         @param disconnect_callback: The callback to invoke on disconnection.
         """
 
+        # Twisted currently does not offer an asynchronous
+        # getaddrinfo-like functionality
+        # (http://twistedmatrix.com/trac/ticket/4362).
+        # See UdpStatsDClient.
         self.host = host
         self.port = port
         self.connect_callback = connect_callback
@@ -56,9 +60,17 @@ class TwistedStatsDClient(object):
         self.transport = None
 
     def write(self, data):
-        """Send the metric to the StatsD server."""
+        """Send the metric to the StatsD server.
+                
+        @param data: The data to be sent.
+        @raise twisted.internet.error.MessageLength: If the size of data
+            is too great.
+        """
         if self.transport is not None:
-            self.transport.write(data, (self.host, self.port))
+            try:
+                return self.transport.write(data, (self.host, self.port))
+            except (OverflowError, TypeError, socket.error, socket.gaierror):
+                return None
 
 
 class UdpStatsDClient(object):
@@ -69,14 +81,23 @@ class UdpStatsDClient(object):
 
         @param host: The StatsD host.
         @param port: The StatsD port.
+        @raise ValueError: If the C{host} and C{port} cannot be
+            resolved (for the case where they are not C{None}).
         """
+        if host is not None and port is not None:
+            try:
+                socket.getaddrinfo(host, port,
+                                   socket.AF_INET, socket.SOCK_DGRAM)
+            except (TypeError, socket.error, socket.gaierror):
+                raise ValueError("The address cannot be resolved.")
+
         self.host = host
         self.port = port
+        self.socket = None
 
     def connect(self):
         """Connect to the StatsD server."""
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        self.addr = (self.host, self.port)
 
     def disconnect(self):
         """Disconnect from the StatsD server."""
@@ -86,9 +107,12 @@ class UdpStatsDClient(object):
 
     def write(self, data):
         """Send the metric to the StatsD server."""
-        if self.addr is None or self.socket is None:
+        if self.host is None or self.port is None or self.socket is None:
             return
-        self.socket.sendto(data, self.addr)
+        try:
+            return self.socket.sendto(data, (self.host, self.port))
+        except (socket.error, socket.herror, socket.gaierror):
+            return None
 
 
 class InternalClient(object):
