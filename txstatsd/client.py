@@ -63,8 +63,8 @@ class TwistedStatsDClient(object):
         """Send the metric to the StatsD server.
                 
         @param data: The data to be sent.
-        @raise twisted.internet.error.MessageLength: If the size of data
-            is too great.
+        @raise twisted.internet.error.MessageLengthError: If the size of data
+            is too large.
         """
         if self.transport is not None:
             try:
@@ -111,7 +111,7 @@ class UdpStatsDClient(object):
             return
         try:
             return self.socket.sendto(data, (self.host, self.port))
-        except (socket.error, socket.herror, socket.gaierror):
+        except (socket.error, socket.gaierror):
             return None
 
 
