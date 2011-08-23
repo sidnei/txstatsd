@@ -17,7 +17,7 @@ class ClientTestsBuilder(ReactorBuilder):
         self.assertEqual(client.write('message'), len('message'))
 
     def test_twistedstatsd_write_with_malformed_address(self):
-        client = TwistedStatsDClient('localhost', -1)
+        client = TwistedStatsDClient('256.0.0.0', 1)
         protocol = StatsDClientProtocol(client)
         reactor = self.buildReactor()
         reactor.listenUDP(0, protocol)
