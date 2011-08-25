@@ -117,6 +117,12 @@ def createService(options):
                                     report_name.upper(), ()):
                 reporting.schedule(reporter, 10, metrics.gauge)
 
+    # Schedule updates for those metrics expecting to be
+    # periodically updated, for example the meter metric.
+    metrics_updater = ReportingService()
+    metrics_updater.setServiceParent(service)
+    metrics_updater.schedule(processor.update_metrics, 5, None)
+
     factory = GraphiteClientFactory(processor, options["flush-interval"])
     client = TCPClient(options["carbon-cache-host"],
                        options["carbon-cache-port"],

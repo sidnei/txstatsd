@@ -5,6 +5,8 @@ import logging
 
 from twisted.python import log
 
+from txstatsd.metrics.metermetric import MeterMetricReporter
+
 
 SPACES = re.compile("\s+")
 SLASHES = re.compile("\/+")
@@ -43,6 +45,7 @@ class MessageProcessor(object):
         self.timer_metrics = {}
         self.counter_metrics = {}
         self.gauge_metrics = deque()
+        self.meter_metrics = {}
 
     def fail(self, message):
         """Log and discard malformed message."""
@@ -72,6 +75,8 @@ class MessageProcessor(object):
             self.process_timer_metric(key, fields[0], message)
         elif fields[1] == "g":
             self.process_gauge_metric(key, fields[0], message)
+        elif fields[1] == "m":
+            self.process_meter_metric(key, fields[0], message)
         else:
             return self.fail(message)
 
@@ -110,6 +115,21 @@ class MessageProcessor(object):
         except (TypeError, ValueError):
             self.fail(message)
 
+    def process_meter_metric(self, key, composite, message):
+        values = composite.split(":")
+        if not len(values) == 1:
+            return self.fail(message)
+
+        try:
+            value = float(values[0])
+        except (TypeError, ValueError):
+            self.fail(message)
+
+        if not key in self.meter_metrics:
+            metric = MeterMetricReporter(key, self.time_function)
+            self.meter_metrics[key] = metric
+        self.meter_metrics[key].mark(value)
+
     def flush(self, interval=10000, percent=90):
         """
         Flush all queued stats, computing a normalized count based on
@@ -134,6 +154,11 @@ class MessageProcessor(object):
         gauge_metrics, events = self.flush_gauge_metrics(timestamp)
         if events > 0:
             messages.extend(gauge_metrics)
+            num_stats += events
+
+        meter_metrics, events = self.flush_meter_metrics(timestamp)
+        if events > 0:
+            messages.extend(meter_metrics)
             num_stats += events
 
         messages.append("statsd.numStats %s %s" % (num_stats, timestamp))
@@ -211,3 +236,17 @@ class MessageProcessor(object):
         self.gauge_metrics.clear()
 
         return (metrics, events)
+
+    def flush_meter_metrics(self, timestamp):
+        metrics = []
+        events = 0
+        for metric in self.meter_metrics.itervalues():
+            message = metric.report(timestamp)
+            metrics.append(message)
+            events += 1
+
+        return (metrics, events)
+
+    def update_metrics(self):
+        for metric in self.meter_metrics.itervalues():
+            metric.tick()

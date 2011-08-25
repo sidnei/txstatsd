@@ -1,3 +1,5 @@
+import time
+
 from unittest import TestCase
 
 from txstatsd.server.processor import MessageProcessor
@@ -224,3 +226,19 @@ class FlushMessagesTest(TestCase):
         self.assertEqual(
             "statsd.numStats 1 42", messages[1])
         self.assertEqual(0, len(self.processor.gauge_metrics))
+
+
+class FlushMeterMetricMessagesTest(TestCase):
+
+    def setUp(self):
+        self.processor = MessageProcessor(time_function=self.wall_clock_time)
+        self.time_now = time.time()
+
+    def wall_clock_time(self):
+        return self.time_now
+
+    def test_flush_meter_metric(self):
+        """
+        Test the correct rendering of the Graphite report for
+        a meter metric.
+        """

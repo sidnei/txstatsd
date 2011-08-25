@@ -1,5 +1,6 @@
 
 from txstatsd.metrics.gaugemetric import GaugeMetric
+from txstatsd.metrics.metermetric import MeterMetric
 from txstatsd.metrics.metric import Metric
 
 
@@ -26,6 +27,16 @@ class Metrics(object):
                                        name,
                                        sample_rate)
             self._metrics[name] = gauge_metric
+        self._metrics[name].mark(value)
+
+    def meter(self, name, value, sample_rate=1):
+        """Mark the occurrence of a given number of events."""
+        name = self.fully_qualify_name(name)
+        if not name in self._metrics:
+            meter_metric = MeterMetric(self.connection,
+                                       name,
+                                       sample_rate)
+            self._metrics[name] = meter_metric
         self._metrics[name].mark(value)
 
     def increment(self, name, value=1, sample_rate=1):

@@ -11,6 +11,9 @@ Things present here
 * The txstatsd python package, containing a server and a client implementation
   for the statsd protocol.
 
+* The metrics support borrows from Coda Hale's Metrics project
+  https://github.com/codahale/metrics.
+
 License
 -------
 
