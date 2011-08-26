@@ -32,6 +32,12 @@ class TestMetrics(TestCase):
         self.assertEqual(self.connection.data,
                          'txstatsd.tests.gauge:102|g')
 
+    def test_meter(self):
+        """Test reporting of a meter metric sample."""
+        self.metrics.meter('meter', 3)
+        self.assertEqual(self.connection.data,
+                         'txstatsd.tests.meter:3|m')
+
     def test_counter(self):
         """Test the increment and decrement operations."""
         self.metrics.increment('counter', 18)

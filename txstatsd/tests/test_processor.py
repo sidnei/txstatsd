@@ -232,13 +232,67 @@ class FlushMeterMetricMessagesTest(TestCase):
 
     def setUp(self):
         self.processor = MessageProcessor(time_function=self.wall_clock_time)
-        self.time_now = time.time()
+        self.time_now = int(time.time())
 
     def wall_clock_time(self):
         return self.time_now
+
+    def mark_minutes(self, minutes):
+        for i in range(1, minutes * 60, 5):
+            self.processor.update_metrics()
 
     def test_flush_meter_metric(self):
         """
         Test the correct rendering of the Graphite report for
         a meter metric.
         """
+        self.processor.process("gorets:3.0|m")
+
+        self.time_now += 1
+        messages = self.processor.flush()
+        self.assertEqual(2, len(messages))
+        meter_metric = messages[0].splitlines()
+        self.assertEqual(
+            "stats.meter.gorets.count 3.0 %s" % self.time_now,
+            meter_metric[0])
+        self.assertEqual(
+            "stats.meter.gorets.mean_rate 3.0 %s" % self.time_now,
+            meter_metric[1])
+        self.assertEqual(
+            "stats.meter.gorets.1min_rate 0.0 %s" % self.time_now,
+            meter_metric[2])
+        self.assertEqual(
+            "stats.meter.gorets.5min_rate 0.0 %s" % self.time_now,
+            meter_metric[3])
+        self.assertEqual(
+            "stats.meter.gorets.15min_rate 0.0 %s" % self.time_now,
+            meter_metric[4])
+        self.assertEqual(
+            "statsd.numStats 1 %s" % self.time_now, messages[1])
+
+        # As we are employing the expected results from test_ewma.py
+        # we perform the initial tick(), before advancing the clock 60sec.
+        self.processor.update_metrics()
+
+        self.mark_minutes(1)
+        self.time_now += 60
+        messages = self.processor.flush()
+        self.assertEqual(2, len(messages))
+        meter_metric = messages[0].splitlines()
+        self.assertEqual(
+            "stats.meter.gorets.count 3.0 %s" % self.time_now,
+            meter_metric[0])
+        self.assertTrue(
+            meter_metric[1].startswith(
+                "stats.meter.gorets.mean_rate 0.04918032"))
+        self.assertTrue(
+            meter_metric[2].startswith(
+                "stats.meter.gorets.1min_rate 0.22072766"))
+        self.assertTrue(
+            meter_metric[3].startswith(
+                "stats.meter.gorets.5min_rate 0.49123845"))
+        self.assertTrue(
+            meter_metric[4].startswith(
+                "stats.meter.gorets.15min_rate 0.5613041"))
+        self.assertEqual(
+            "statsd.numStats 1 %s" % self.time_now, messages[1])
