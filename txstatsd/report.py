@@ -16,8 +16,15 @@ class ReportingService(Service):
         """
         Schedule C{function} to be called every C{interval} seconds and then
         report gathered metrics to C{Graphite} using C{report_function}.
+
+        If C{report_function} is C{None}, it just calls the function without
+        reporting the metrics.
         """
-        task = LoopingCall(self.wrapped(function, report_function))
+        if report_function is not None:
+            call = self.wrapped(function, report_function)
+        else:
+            call = function
+        task = LoopingCall(call)
         self.tasks.append((task, interval))
 
     def wrapped(self, function, report_function):
