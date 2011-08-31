@@ -84,12 +84,18 @@ class StatsDOptions(OptionsGlue):
          "The port where carbon cache is listening.", int],
         ["listen-port", "l", 8125,
          "The UDP port where we will listen.", int],
-        ["flush-interval", "i", 10000,
+        ["flush-interval", "i", 60000,
          "The number of milliseconds between each flush.", int],
+        ["statsd-compatibility", "s", 1,
+         "Metrics sent to Graphite compatible with StatsD.", int],
         ["prefix", "p", None,
          "Prefix to use when reporting stats.", str],
         ["report", "r", None,
          "Which additional stats to report {process|net|io|system}.", str],
+        ["monitor-message", "m", "txstatsd ping",
+         "Message we expect from monitoring agent.", str],
+        ["monitor-response", "o", "txstatsd pong",
+         "Response we should send monitoring agent.", str]
     ]
 
 
@@ -129,8 +135,11 @@ def createService(options):
                        factory)
     client.setServiceParent(service)
 
-    listener = UDPServer(options["listen-port"],
-        StatsDServerProtocol(processor))
+    statsd_server_protocol = StatsDServerProtocol(
+        processor,
+        monitor_message=options["monitor-message"],
+        monitor_response=options["monitor-response"])
+    listener = UDPServer(options["listen-port"], statsd_server_protocol)
     listener.setServiceParent(service)
 
     return service

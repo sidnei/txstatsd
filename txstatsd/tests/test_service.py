@@ -2,7 +2,14 @@ import ConfigParser
 import tempfile
 from unittest import TestCase
 
+from twisted.internet import reactor
+from twisted.internet.defer import inlineCallbacks, Deferred
+from twisted.internet.protocol import DatagramProtocol
+from twisted.internet.test.reactormixins import ReactorBuilder
+
 from txstatsd import service
+from txstatsd.server.processor import MessageProcessor
+from txstatsd.server.protocol import StatsDServerProtocol
 
 
 class GlueOptionsTestCase(TestCase):
@@ -94,7 +101,16 @@ class GlueOptionsTestCase(TestCase):
         self.assertEquals(5, o["number"])
 
 
-class ServiceTests(TestCase):
+class Agent(DatagramProtocol):
+
+    def __init__(self):
+        self.monitor_response = None
+
+    def datagramReceived(self, data, (host, port)):
+        self.monitor_response = data
+
+
+class ServiceTestsBuilder(ReactorBuilder):
 
     def test_service(self):
         """
@@ -103,3 +119,49 @@ class ServiceTests(TestCase):
         o = service.StatsDOptions()
         s = service.createService(o)
         self.assertTrue(isinstance(s, service.MultiService))
+
+    def test_monitor_response(self):
+        """
+        The StatsD service messages the expected response to the
+        monitoring agent.
+        """
+        reactor = self.buildReactor()
+
+        options = service.StatsDOptions()
+        processor = MessageProcessor()
+        statsd_server_protocol = StatsDServerProtocol(
+            processor,
+            monitor_message=options["monitor-message"],
+            monitor_response=options["monitor-response"])
+        reactor.listenUDP(options["listen-port"], statsd_server_protocol)
+
+        agent = Agent()
+        reactor.listenUDP(0, agent)
+
+        @inlineCallbacks
+        def exercise():
+            def monitor_send():
+                agent.transport.write(
+                    options["monitor-message"],
+                    ("127.0.0.1", options["listen-port"]))
+
+            def statsd_response(result):
+                self.assertEqual(options["monitor-response"],
+                                 agent.monitor_response)
+
+            yield monitor_send()
+
+            d = Deferred()
+            d.addCallback(statsd_response)
+            reactor.callLater(.1, d.callback, None)
+            try:
+                yield d
+            except:
+                raise
+            finally:
+                reactor.stop()
+
+        reactor.callWhenRunning(exercise)
+        self.runReactor(reactor)
+
+globals().update(ServiceTestsBuilder.makeTestCaseClasses())
