@@ -2,7 +2,6 @@ import ConfigParser
 import tempfile
 from unittest import TestCase
 
-from twisted.internet import reactor
 from twisted.internet.defer import inlineCallbacks, Deferred
 from twisted.internet.protocol import DatagramProtocol
 from twisted.internet.test.reactormixins import ReactorBuilder

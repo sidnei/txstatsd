@@ -86,8 +86,6 @@ class StatsDOptions(OptionsGlue):
          "The UDP port where we will listen.", int],
         ["flush-interval", "i", 60000,
          "The number of milliseconds between each flush.", int],
-        ["statsd-compatibility", "s", 1,
-         "Metrics sent to Graphite compatible with StatsD.", int],
         ["prefix", "p", None,
          "Prefix to use when reporting stats.", str],
         ["report", "r", None,
