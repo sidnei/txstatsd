@@ -10,6 +10,7 @@ from txstatsd import process
 from txstatsd.client import InternalClient
 from txstatsd.metrics.metrics import Metrics
 from txstatsd.server.processor import MessageProcessor
+from txstatsd.server.configurableprocessor import ConfigurableMessageProcessor
 from txstatsd.server.protocol import GraphiteClientFactory, StatsDServerProtocol
 from txstatsd.report import ReportingService
 
@@ -94,6 +95,8 @@ class StatsDOptions(OptionsGlue):
          "Message we expect from monitoring agent.", str],
         ["monitor-response", "o", "txstatsd pong",
          "Response we should send monitoring agent.", str]
+        ["statsd-compliance", "s", 1,
+         "Produce StatsD-compliant messages.", int]
     ]
 
 
@@ -102,13 +105,19 @@ def createService(options):
 
     service = MultiService()
     service.setName("statsd")
-    processor = MessageProcessor()
+
     prefix = options["prefix"]
     if prefix is None:
         prefix = socket.gethostname() + ".statsd"
 
-    connection = InternalClient(processor)
-    metrics = Metrics(connection, namespace=prefix)
+    if options["statsd-compliance"]:
+        processor = MessageProcessor()
+        connection = InternalClient(processor)
+        metrics = Metrics(connection, namespace=prefix)
+    else:
+        processor = ConfigurableMessageProcessor(message_prefix=prefix)
+        connection = InternalClient(processor)
+        metrics = Metrics(connection)
 
     if options["report"] is not None:
         reporting = ReportingService()

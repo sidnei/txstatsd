@@ -12,19 +12,6 @@ SPACES = re.compile("\s+")
 SLASHES = re.compile("\/+")
 NON_ALNUM = re.compile("[^a-zA-Z_\-0-9\.]")
 RATE = re.compile("^@([\d\.]+)")
-COUNTERS_MESSAGE = (
-    "stats.%(key)s %(value)s %(timestamp)s\n"
-    "stats_counts.%(key)s %(count)s %(timestamp)s\n")
-TIMERS_MESSAGE = (
-    "stats.timers.%(key)s.mean %(mean)s %(timestamp)s\n"
-    "stats.timers.%(key)s.upper %(upper)s %(timestamp)s\n"
-    "stats.timers.%(key)s.upper_%(percent)s %(threshold_upper)s"
-        " %(timestamp)s\n"
-    "stats.timers.%(key)s.lower %(lower)s %(timestamp)s\n"
-    "stats.timers.%(key)s.count %(count)s %(timestamp)s\n")
-
-GAUGE_METRIC_MESSAGE = (
-    "stats.gauge.%(key)s.value %(value)s %(timestamp)s\n")
 
 
 def normalize_key(key):
@@ -39,9 +26,36 @@ def normalize_key(key):
 
 
 class MessageProcessor(object):
+    """
+    This C{MessageProcessor} produces StatsD-compliant messages
+    for publishing to a Graphite server.
+    Metrics behaviour that varies from StatsD should be placed in
+    some specialised C{MessageProcessor} (see L{ConfigurableMessageProcessor
+    <txstatsd.server.configurableprocessor.ConfigurableMessageProcessor>}).
+    """
+
+    COUNTERS_MESSAGE = (
+        "stats.%(key)s %(value)s %(timestamp)s\n"
+        "stats_counts.%(key)s %(count)s %(timestamp)s\n")
+
+    TIMERS_MESSAGE = (
+        "stats.timers.%(key)s.mean %(mean)s %(timestamp)s\n"
+        "stats.timers.%(key)s.upper %(upper)s %(timestamp)s\n"
+        "stats.timers.%(key)s.upper_%(percent)s %(threshold_upper)s"
+            " %(timestamp)s\n"
+        "stats.timers.%(key)s.lower %(lower)s %(timestamp)s\n"
+        "stats.timers.%(key)s.count %(count)s %(timestamp)s\n")
+
+    GAUGE_METRIC_MESSAGE = (
+        "stats.gauge.%(key)s.value %(value)s %(timestamp)s\n")
 
     def __init__(self, time_function=time.time):
         self.time_function = time_function
+
+        self.counters_message = MessageProcessor.COUNTERS_MESSAGE
+        self.timers_message = MessageProcessor.TIMERS_MESSAGE
+        self.gauge_metric_message = MessageProcessor.GAUGE_METRIC_MESSAGE
+
         self.timer_metrics = {}
         self.counter_metrics = {}
         self.gauge_metrics = deque()
@@ -125,8 +139,12 @@ class MessageProcessor(object):
         except (TypeError, ValueError):
             self.fail(message)
 
+        self.compose_meter_metric(key, value)
+
+    def compose_meter_metric(self, key, value):
         if not key in self.meter_metrics:
-            metric = MeterMetricReporter(key, self.time_function)
+            metric = MeterMetricReporter(key, self.time_function,
+                                         prefix="stats.meter")
             self.meter_metrics[key] = metric
         self.meter_metrics[key].mark(value)
 
@@ -171,7 +189,7 @@ class MessageProcessor(object):
             self.counter_metrics[key] = 0
 
             value = count / interval
-            message = COUNTERS_MESSAGE % {
+            message = self.counters_message % {
                 "key": key,
                 "value": value,
                 "count": count,
@@ -205,7 +223,7 @@ class MessageProcessor(object):
                     threshold_upper = timers[-1]
                     mean = sum(timers) / index
 
-                message = TIMERS_MESSAGE % {
+                message = self.timers_message % {
                     "key": key,
                     "mean": mean,
                     "upper": upper,
@@ -226,7 +244,7 @@ class MessageProcessor(object):
             value = metric[0]
             key = metric[1]
 
-            message = GAUGE_METRIC_MESSAGE % {
+            message = self.gauge_metric_message % {
                 "key": key,
                 "value": value,
                 "timestamp": timestamp}

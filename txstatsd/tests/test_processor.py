@@ -3,6 +3,7 @@ import time
 from unittest import TestCase
 
 from txstatsd.server.processor import MessageProcessor
+from txstatsd.server.configurableprocessor import ConfigurableMessageProcessor
 
 
 class TestMessageProcessor(MessageProcessor):
@@ -10,6 +11,17 @@ class TestMessageProcessor(MessageProcessor):
     def __init__(self):
         super(TestMessageProcessor, self).__init__()
         self.failures = []
+
+    def fail(self, message):
+        self.failures.append(message)
+
+
+class TestConfigurableMessageProcessor(ConfigurableMessageProcessor):
+
+    def __init__(self, time_function=time.time, message_prefix=""):
+        super(TestConfigurableMessageProcessor, self).__init__(
+            time_function,
+            message_prefix)
 
     def fail(self, message):
         self.failures.append(message)
@@ -133,6 +145,38 @@ class FlushMessagesTest(TestCase):
         self.assertEqual("statsd.numStats 1 42", messages[1])
         self.assertEqual(0, self.processor.counter_metrics["gorets"])
 
+    def test_flush_counter_with_empty_prefix(self):
+        """
+        Ensure no prefix features if none is supplied.
+        """
+        configurable_processor = ConfigurableMessageProcessor(
+            time_function=lambda: 42)
+        configurable_processor.counter_metrics["gorets"] = 42
+        messages = configurable_processor.flush()
+        self.assertEqual(2, len(messages))
+        counters = messages[0].splitlines()
+        self.assertEqual("gorets 4 42", counters[0])
+        self.assertEqual("gorets 42 42", counters[1])
+        self.assertEqual("statsd.numStats 1 42", messages[1])
+        self.assertEqual(
+            0, configurable_processor.counter_metrics["gorets"])
+
+    def test_flush_counter_with_prefix(self):
+        """
+        Ensure the prefix features if one is supplied.
+        """
+        configurable_processor = ConfigurableMessageProcessor(
+            time_function=lambda: 42, message_prefix="test.metric")
+        configurable_processor.counter_metrics["gorets"] = 42
+        messages = configurable_processor.flush()
+        self.assertEqual(2, len(messages))
+        counters = messages[0].splitlines()
+        self.assertEqual("test.metric.gorets 4 42", counters[0])
+        self.assertEqual("test.metric.gorets 42 42", counters[1])
+        self.assertEqual("statsd.numStats 1 42", messages[1])
+        self.assertEqual(
+            0, configurable_processor.counter_metrics["gorets"])
+
     def test_flush_counter_one_second_interval(self):
         """
         It is possible to flush counters with a one-second interval, in which
@@ -232,6 +276,8 @@ class FlushMeterMetricMessagesTest(TestCase):
 
     def setUp(self):
         self.processor = MessageProcessor(time_function=self.wall_clock_time)
+        self.configurable_processor = ConfigurableMessageProcessor(
+            time_function=self.wall_clock_time, message_prefix="test.metric")
         self.time_now = int(time.time())
 
     def wall_clock_time(self):
@@ -240,6 +286,35 @@ class FlushMeterMetricMessagesTest(TestCase):
     def mark_minutes(self, minutes):
         for i in range(1, minutes * 60, 5):
             self.processor.update_metrics()
+
+    def test_flush_meter_metric_with_prefix(self):
+        """
+        Test the correct rendering of the Graphite report for
+        a meter metric when a prefix is supplied.
+        """
+        self.configurable_processor.process("gorets:3.0|m")
+
+        self.time_now += 1
+        messages = self.configurable_processor.flush()
+        self.assertEqual(2, len(messages))
+        meter_metric = messages[0].splitlines()
+        self.assertEqual(
+            "test.metric.gorets.count 3.0 %s" % self.time_now,
+            meter_metric[0])
+        self.assertEqual(
+            "test.metric.gorets.mean_rate 3.0 %s" % self.time_now,
+            meter_metric[1])
+        self.assertEqual(
+            "test.metric.gorets.1min_rate 0.0 %s" % self.time_now,
+            meter_metric[2])
+        self.assertEqual(
+            "test.metric.gorets.5min_rate 0.0 %s" % self.time_now,
+            meter_metric[3])
+        self.assertEqual(
+            "test.metric.gorets.15min_rate 0.0 %s" % self.time_now,
+            meter_metric[4])
+        self.assertEqual(
+            "statsd.numStats 1 %s" % self.time_now, messages[1])
 
     def test_flush_meter_metric(self):
         """

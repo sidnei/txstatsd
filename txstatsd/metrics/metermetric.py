@@ -1,4 +1,6 @@
 
+from string import Template
+
 import time
 
 from txstatsd.metrics.metric import Metric
@@ -43,13 +45,13 @@ class MeterMetricReporter(object):
     """
 
     MESSAGE = (
-        "stats.meter.%(key)s.count %(count)s %(timestamp)s\n"
-        "stats.meter.%(key)s.mean_rate %(mean_rate)s %(timestamp)s\n"
-        "stats.meter.%(key)s.1min_rate %(rate_1min)s %(timestamp)s\n"
-        "stats.meter.%(key)s.5min_rate %(rate_5min)s %(timestamp)s\n"
-        "stats.meter.%(key)s.15min_rate %(rate_15min)s %(timestamp)s\n")
+        "$prefix%(key)s.count %(count)s %(timestamp)s\n"
+        "$prefix%(key)s.mean_rate %(mean_rate)s %(timestamp)s\n"
+        "$prefix%(key)s.1min_rate %(rate_1min)s %(timestamp)s\n"
+        "$prefix%(key)s.5min_rate %(rate_5min)s %(timestamp)s\n"
+        "$prefix%(key)s.15min_rate %(rate_15min)s %(timestamp)s\n")
 
-    def __init__(self, name, wall_time_func=time.time):
+    def __init__(self, name, wall_time_func=time.time, prefix=""):
         """Construct a metric we expect to be periodically updated.
 
         @param name: Indicates what is being instrumented.
@@ -57,6 +59,9 @@ class MeterMetricReporter(object):
         """
         self.name = name
         self.wall_time_func = wall_time_func
+
+        self.message = Template(MeterMetricReporter.MESSAGE).substitute(
+            prefix=prefix + '.')
 
         self.m1_rate = Ewma.one_minute_ewma()
         self.m5_rate = Ewma.five_minute_ewma()
@@ -78,7 +83,7 @@ class MeterMetricReporter(object):
         self.m15_rate.tick()
 
     def report(self, timestamp):
-        return MeterMetricReporter.MESSAGE % {
+        return self.message % {
             "key": self.name,
             "count": self.count,
             "mean_rate": self.mean_rate(),
