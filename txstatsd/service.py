@@ -94,7 +94,7 @@ class StatsDOptions(OptionsGlue):
         ["monitor-message", "m", "txstatsd ping",
          "Message we expect from monitoring agent.", str],
         ["monitor-response", "o", "txstatsd pong",
-         "Response we should send monitoring agent.", str]
+         "Response we should send monitoring agent.", str],
         ["statsd-compliance", "s", 1,
          "Produce StatsD-compliant messages.", int]
     ]
