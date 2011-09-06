@@ -65,6 +65,8 @@ class TwistedStatsDClient(object):
                 
         @param data: The data to be sent.
         @param callback: The callback to which the result should be sent.
+            B{Note}: The C{callback} will be called in the C{reactor}
+            thread, and not in the thread of the original caller.
         """
         reactor.callFromThread(self._write, data, callback)
 
