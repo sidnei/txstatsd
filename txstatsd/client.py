@@ -1,5 +1,6 @@
 import socket
 
+from twisted.internet import reactor
 from twisted.internet.protocol import DatagramProtocol
 
 
@@ -59,18 +60,30 @@ class TwistedStatsDClient(object):
             self.disconnect_callback()
         self.transport = None
 
-    def write(self, data):
+    def write(self, data, callback=None):
         """Send the metric to the StatsD server.
                 
         @param data: The data to be sent.
+        @param callback: The callback to which the result should be sent.
+        """
+        reactor.callFromThread(self._write, data, callback)
+
+    def _write(self, data, callback):
+        """Send the metric to the StatsD server.
+                
+        @param data: The data to be sent.
+        @param callback: The callback to which the result should be sent.
         @raise twisted.internet.error.MessageLengthError: If the size of data
             is too large.
         """
         if self.transport is not None:
             try:
-                return self.transport.write(data, (self.host, self.port))
+                bytes_sent = self.transport.write(data, (self.host, self.port))
+                if callback is not None:
+                    callback(bytes_sent)
             except (OverflowError, TypeError, socket.error, socket.gaierror):
-                return None
+                if callback is not None:
+                    callback(None)
 
 
 class UdpStatsDClient(object):
