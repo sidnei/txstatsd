@@ -1,28 +1,55 @@
 """Tests for the various client classes."""
 
-from twisted.internet.test.reactormixins import ReactorBuilder
+from twisted.internet import reactor
+from twisted.internet.defer import Deferred
+from twisted.trial.unittest import TestCase
 
 from txstatsd.client import (
     StatsDClientProtocol, TwistedStatsDClient, UdpStatsDClient)
 
 
-class ClientTestsBuilder(ReactorBuilder):
+class TestClient(TestCase):
+
+    def setUp(self):
+        super(TestClient, self).setUp()
+        self.client = None
+
+    def tearDown(self):
+        if self.client:
+            self.client.transport.stopListening()
+        super(TestClient, self).tearDown()
 
     def test_twistedstatsd_write_with_wellformed_address(self):
-        client = TwistedStatsDClient('localhost', 8000)
-        protocol = StatsDClientProtocol(client)
-        reactor = self.buildReactor()
+        self.client = TwistedStatsDClient('localhost', 8000)
+        protocol = StatsDClientProtocol(self.client)
         reactor.listenUDP(0, protocol)
 
-        self.assertEqual(client.write('message'), len('message'))
+        def ensure_bytes_sent(bytes_sent):
+            self.assertEqual(bytes_sent, len('message'))
+
+        def exercise(callback):
+            self.client.write('message', callback=callback)
+
+        d = Deferred()
+        d.addCallback(ensure_bytes_sent)
+        reactor.callWhenRunning(exercise, d.callback)
+        return d
 
     def test_twistedstatsd_write_with_malformed_address(self):
-        client = TwistedStatsDClient('256.0.0.0', 1)
-        protocol = StatsDClientProtocol(client)
-        reactor = self.buildReactor()
+        self.client = TwistedStatsDClient('256.0.0.0', 1)
+        protocol = StatsDClientProtocol(self.client)
         reactor.listenUDP(0, protocol)
 
-        self.assertEqual(client.write('message'), None)
+        def ensure_bytes_sent(bytes_sent):
+            self.assertEqual(bytes_sent, None)
+
+        def exercise(callback):
+            self.client.write('message', callback=callback)
+
+        d = Deferred()
+        d.addCallback(ensure_bytes_sent)
+        reactor.callWhenRunning(exercise, d.callback)
+        return d
 
     def test_udpstatsd_wellformed_address(self):
         client = UdpStatsDClient('localhost', 8000)
@@ -37,5 +64,3 @@ class ClientTestsBuilder(ReactorBuilder):
                           UdpStatsDClient, 'localhost', 'malformed')
         self.assertRaises(ValueError,
                           UdpStatsDClient, 0, 8000)
-
-globals().update(ClientTestsBuilder.makeTestCaseClasses())
