@@ -20,7 +20,7 @@ class TestClient(TestCase):
         super(TestClient, self).tearDown()
 
     def test_twistedstatsd_write_with_wellformed_address(self):
-        self.client = TwistedStatsDClient('localhost', 8000)
+        self.client = TwistedStatsDClient('127.0.0.1', 8000)
         protocol = StatsDClientProtocol(self.client)
         reactor.listenUDP(0, protocol)
 
