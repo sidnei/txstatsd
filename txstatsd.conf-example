@@ -5,15 +5,19 @@ carbon-cache-host: localhost
 carbon-cache-port: 2003
 # The UDP port where we will listen.
 listen-port: 8125
+
 # The number of milliseconds between each flush.
 flush-interval: 60000
+
 # Which additional stats to report {process|net|io|system}.
 report:
 # Prefix to use when reporting stats.
 prefix:
+# Produce StatsD-compliant messages.
+statsd-compliance: 1
+
 # Support application monitoring. UDP echo is initially supported.
 # Should we receive the monitor-message, we respond with the
 # configured monitor-response.
 monitor-message: txstatsd ping
 monitor-response: txstatsd pong
-
