@@ -1,4 +1,7 @@
+from txstatsd.metrics.metrics import Metrics
+
 class FakeStatsDClient(object):
+    """A fake C{StatsDClient} that simply appends to metrics.data on write."""
 
     def __init__(self, metrics):
         self.metrics = metrics
