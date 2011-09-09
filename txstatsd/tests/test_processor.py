@@ -148,18 +148,18 @@ class FlushMessagesTest(TestCase):
     def test_flush_counter_with_empty_prefix(self):
         """
         Ensure no prefix features if none is supplied.
+        B{Note}: The C{ConfigurableMessageProcessor} reports
+        the counter value, and not the normalized version as
+        seen in the StatsD-compliant C{Processor}.
         """
         configurable_processor = ConfigurableMessageProcessor(
             time_function=lambda: 42)
-        configurable_processor.counter_metrics["gorets"] = 42
+        configurable_processor.process("gorets:17|c")
         messages = configurable_processor.flush()
         self.assertEqual(2, len(messages))
         counters = messages[0].splitlines()
-        self.assertEqual("gorets 4 42", counters[0])
-        self.assertEqual("gorets 42 42", counters[1])
+        self.assertEqual("gorets.count 17 42", counters[0])
         self.assertEqual("statsd.numStats 1 42", messages[1])
-        self.assertEqual(
-            0, configurable_processor.counter_metrics["gorets"])
 
     def test_flush_counter_with_prefix(self):
         """
@@ -167,15 +167,12 @@ class FlushMessagesTest(TestCase):
         """
         configurable_processor = ConfigurableMessageProcessor(
             time_function=lambda: 42, message_prefix="test.metric")
-        configurable_processor.counter_metrics["gorets"] = 42
+        configurable_processor.process("gorets:17|c")
         messages = configurable_processor.flush()
         self.assertEqual(2, len(messages))
         counters = messages[0].splitlines()
-        self.assertEqual("test.metric.gorets 4 42", counters[0])
-        self.assertEqual("test.metric.gorets 42 42", counters[1])
+        self.assertEqual("test.metric.gorets.count 17 42", counters[0])
         self.assertEqual("statsd.numStats 1 42", messages[1])
-        self.assertEqual(
-            0, configurable_processor.counter_metrics["gorets"])
 
     def test_flush_counter_one_second_interval(self):
         """

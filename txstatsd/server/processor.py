@@ -114,6 +114,10 @@ class MessageProcessor(object):
             if match is None:
                 return self.fail(message)
             rate = match.group(1)
+
+        self.compose_counter_metric(key, value, rate)
+
+    def compose_counter_metric(self, key, value, rate):
         if key not in self.counter_metrics:
             self.counter_metrics[key] = 0
         self.counter_metrics[key] += value * (1 / float(rate))
