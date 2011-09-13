@@ -60,8 +60,10 @@ class MeterMetricReporter(object):
         self.name = name
         self.wall_time_func = wall_time_func
 
+        if prefix:
+            prefix += '.'
         self.message = Template(MeterMetricReporter.MESSAGE).substitute(
-            prefix=prefix + '.')
+            prefix=prefix)
 
         self.m1_rate = Ewma.one_minute_ewma()
         self.m5_rate = Ewma.five_minute_ewma()
