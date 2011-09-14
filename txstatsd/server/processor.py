@@ -94,14 +94,18 @@ class MessageProcessor(object):
         else:
             return self.fail(message)
 
-    def process_timer_metric(self, key, value, message):
+    def process_timer_metric(self, key, duration, message):
         try:
-            value = float(value)
+            duration = float(duration)
         except (TypeError, ValueError):
             return self.fail(message)
+
+        self.compose_timer_metric(key, duration)
+
+    def compose_timer_metric(self, key, duration):
         if key not in self.timer_metrics:
             self.timer_metrics[key] = []
-        self.timer_metrics[key].append(value)
+        self.timer_metrics[key].append(duration)
 
     def process_counter_metric(self, key, composite, message):
         try:

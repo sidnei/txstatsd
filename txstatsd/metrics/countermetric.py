@@ -67,7 +67,7 @@ class CounterMetricReporter(object):
         self.count = 0
 
     def mark(self, value):
-        self.count += value
+        self.count = value
 
     def report(self, timestamp):
         return self.message % {

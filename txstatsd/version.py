@@ -1,1 +1,1 @@
-txstatsd = "0.4.0"
+txstatsd = "0.5.0"
