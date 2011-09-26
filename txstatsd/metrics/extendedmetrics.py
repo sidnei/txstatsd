@@ -1,5 +1,6 @@
 
 from txstatsd.metrics.countermetric import CounterMetric
+from txstatsd.metrics.timermetric import TimerMetric
 from txstatsd.metrics.metrics import Metrics
 
 
@@ -37,3 +38,13 @@ class ExtendedMetrics(Metrics):
                                    sample_rate)
             self._metrics[name] = metric
         self._metrics[name].decrement(value)
+
+    def timing(self, name, duration, sample_rate=1):
+        """Report this sample performed in duration ms."""
+        name = self.fully_qualify_name(name)
+        if not name in self._metrics:
+            metric = TimerMetric(self.connection,
+                                 name,
+                                 sample_rate)
+            self._metrics[name] = metric
+        self._metrics[name].mark(duration)

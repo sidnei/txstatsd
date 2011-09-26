@@ -5,6 +5,7 @@ import time
 
 from txstatsd.metrics.countermetric import CounterMetricReporter
 from txstatsd.metrics.metermetric import MeterMetricReporter
+from txstatsd.metrics.timermetric import TimerMetricReporter
 from txstatsd.server.processor import MessageProcessor
 
 
@@ -12,25 +13,17 @@ class ConfigurableMessageProcessor(MessageProcessor):
     """
     This specialised C{MessageProcessor} supports behaviour
     that is not StatsD-compliant.
+
     Currently, this extends to:
     - Allow a prefix to be added to the composed messages sent
       to the Graphite server.
     - Report an incrementing and decrementing counter metric.
+    - Report a timer metric which aggregates timing durations and provides
+      duration statistics, plus throughput statistics.
     """
 
-    # Notice: These messages replicate those seen in the
-    # MessageProcessor (excepting the prefix identifier).
-    # In a future release they will be placed in their
-    # respective metric reporter class.
-    # See MeterMetricReporter.
-    TIMERS_MESSAGE = (
-        "$prefix%(key)s.mean %(mean)s %(timestamp)s\n"
-        "$prefix%(key)s.upper %(upper)s %(timestamp)s\n"
-        "$prefix%(key)s.upper_%(percent)s %(threshold_upper)s"
-            " %(timestamp)s\n"
-        "$prefix%(key)s.lower %(lower)s %(timestamp)s\n"
-        "$prefix%(key)s.count %(count)s %(timestamp)s\n")
-
+    #TODO Provide a GaugeMetricReporter (in the manner of the other
+    # Coda Hale metrics).
     GAUGE_METRIC_MESSAGE = (
         "$prefix%(key)s.value %(value)s %(timestamp)s\n")
 
@@ -41,13 +34,15 @@ class ConfigurableMessageProcessor(MessageProcessor):
         if message_prefix:
             message_prefix += '.'
 
-        message = Template(ConfigurableMessageProcessor.TIMERS_MESSAGE)
-        self.timers_message = message.substitute(
-            prefix=message_prefix)
-
         message = Template(ConfigurableMessageProcessor.GAUGE_METRIC_MESSAGE)
         self.gauge_metric_message = message.substitute(
             prefix=message_prefix)
+
+    def compose_timer_metric(self, key, duration):
+        if not key in self.timer_metrics:
+            metric = TimerMetricReporter(key, prefix=self.message_prefix)
+            self.timer_metrics[key] = metric
+        self.timer_metrics[key].update(duration)
 
     def process_counter_metric(self, key, composite, message):
         try:
@@ -79,3 +74,19 @@ class ConfigurableMessageProcessor(MessageProcessor):
             events += 1
 
         return (metrics, events)
+
+    def flush_timer_metrics(self, percent, timestamp):
+        metrics = []
+        events = 0
+        for metric in self.timer_metrics.itervalues():
+            message = metric.report(timestamp)
+            metrics.append(message)
+            events += 1
+
+        return (metrics, events)
+
+    def update_metrics(self):
+        super(ConfigurableMessageProcessor, self).update_metrics()
+
+        for metric in self.timer_metrics.itervalues():
+            metric.tick()
