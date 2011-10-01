@@ -34,11 +34,7 @@ def accumulateClassList(classObj, attr, listObj,
 
 
 class OptionsGlue(usage.Options):
-    """Extends usage.Options to also read parameters from a config file.
-
-    This is made far more complicated than should be necessary, as
-    usage.Options does not appear to have been designed for extension.
-    """
+    """Extends usage.Options to also read parameters from a config file."""
 
     optParameters = [
         ["config", "c", None, "Config file to use."]

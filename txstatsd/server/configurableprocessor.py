@@ -1,9 +1,8 @@
 
-from string import Template
-
 import time
 
 from txstatsd.metrics.countermetric import CounterMetricReporter
+from txstatsd.metrics.gaugemetric import GaugeMetricReporter
 from txstatsd.metrics.metermetric import MeterMetricReporter
 from txstatsd.metrics.timermetric import TimerMetricReporter
 from txstatsd.server.processor import MessageProcessor
@@ -17,26 +16,18 @@ class ConfigurableMessageProcessor(MessageProcessor):
     Currently, this extends to:
     - Allow a prefix to be added to the composed messages sent
       to the Graphite server.
+    - Report an instantaneous reading of a particular value.
     - Report an incrementing and decrementing counter metric.
     - Report a timer metric which aggregates timing durations and provides
       duration statistics, plus throughput statistics.
     """
 
-    #TODO Provide a GaugeMetricReporter (in the manner of the other
-    # Coda Hale metrics).
-    GAUGE_METRIC_MESSAGE = (
-        "$prefix%(key)s.value %(value)s %(timestamp)s\n")
-
     def __init__(self, time_function=time.time, message_prefix=""):
-        super(ConfigurableMessageProcessor, self).__init__(time_function)
+        super(ConfigurableMessageProcessor, self).__init__(
+            time_function=time_function)
 
         self.message_prefix = message_prefix
-        if message_prefix:
-            message_prefix += '.'
-
-        message = Template(ConfigurableMessageProcessor.GAUGE_METRIC_MESSAGE)
-        self.gauge_metric_message = message.substitute(
-            prefix=message_prefix)
+        self.gauge_metrics = {}
 
     def compose_timer_metric(self, key, duration):
         if not key in self.timer_metrics:
@@ -58,6 +49,12 @@ class ConfigurableMessageProcessor(MessageProcessor):
             self.counter_metrics[key] = metric
         self.counter_metrics[key].mark(value)
 
+    def compose_gauge_metric(self, key, value):
+        if not key in self.gauge_metrics:
+            metric = GaugeMetricReporter(key, prefix=self.message_prefix)
+            self.gauge_metrics[key] = metric
+        self.gauge_metrics[key].mark(value)
+
     def compose_meter_metric(self, key, value):
         if not key in self.meter_metrics:
             metric = MeterMetricReporter(key, self.time_function,
@@ -69,6 +66,16 @@ class ConfigurableMessageProcessor(MessageProcessor):
         metrics = []
         events = 0
         for metric in self.counter_metrics.itervalues():
+            message = metric.report(timestamp)
+            metrics.append(message)
+            events += 1
+
+        return (metrics, events)
+
+    def flush_gauge_metrics(self, timestamp):
+        metrics = []
+        events = 0
+        for metric in self.gauge_metrics.itervalues():
             message = metric.report(timestamp)
             metrics.append(message)
             events += 1

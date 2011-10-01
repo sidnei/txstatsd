@@ -132,10 +132,15 @@ class MessageProcessor(object):
             return self.fail(message)
 
         try:
-            metric = [float(values[0]), key]
-            self.gauge_metrics.append(metric)
+            value = float(values[0])
         except (TypeError, ValueError):
             self.fail(message)
+
+        self.compose_gauge_metric(key, value)
+
+    def compose_gauge_metric(self, key, value):
+        metric = [value, key]
+        self.gauge_metrics.append(metric)
 
     def process_meter_metric(self, key, composite, message):
         values = composite.split(":")
