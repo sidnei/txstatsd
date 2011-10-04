@@ -1,7 +1,7 @@
 
 import time
 
-from logbook import Logger, RotatingFileHandler
+from logbook import Handler, Logger
 
 from txstatsd.server.configurableprocessor import ConfigurableMessageProcessor
 
@@ -9,15 +9,18 @@ from txstatsd.server.configurableprocessor import ConfigurableMessageProcessor
 class LoggingMessageProcessor(ConfigurableMessageProcessor):
     """
     This specialised C{MessageProcessor} logs the received metrics
-    to the supplied log file.
+    using the supplied logging handler.
     """
 
-    def __init__(self, log_path, time_function=time.time, message_prefix=""):
+    def __init__(self, logging_handler, time_function=time.time,
+                 message_prefix=""):
         super(LoggingMessageProcessor, self).__init__(
             time_function=time_function, message_prefix=message_prefix)
 
+        if not isinstance(logging_handler, Handler):
+            raise TypeError('Expecting a logbook Handler')
+        self.logging_handler = logging_handler
         self.log = Logger('metrics')
-        self.logging_handler = RotatingFileHandler(log_path)
 
     def flush(self):
         """Log all received metric samples to the supplied log file."""
