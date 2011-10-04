@@ -8,7 +8,7 @@ class LoggingMessageProcessor(ConfigurableMessageProcessor):
     """
     This specialised C{MessageProcessor} logs the received metrics
     using the supplied logger (which should have a callable C{info}
-    attribute.
+    attribute.)
     """
 
     def __init__(self, logger, time_function=time.time, message_prefix=""):
