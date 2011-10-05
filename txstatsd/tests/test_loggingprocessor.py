@@ -12,28 +12,32 @@ class FakeMeterMetric(object):
 class TestLoggingMessageProcessor(TestCase):
 
     def test_logger_with_no_info(self):
-        with self.assertRaises(TypeError):
+        def invoker():
             logger = 'logger'
             LoggingMessageProcessor(logger)
 
+        self.assertRaises(TypeError, invoker)
+
     def test_logger_with_non_callable_info(self):
-        with self.assertRaises(TypeError):
-            class L(object):
+        def invoker():
+            class Logger(object):
                 def __init__(self):
                     self.info = 'logger'
 
-            logger = L()
+            logger = Logger()
             LoggingMessageProcessor(logger)
 
+        self.assertRaises(TypeError, invoker)
+
     def test_logger(self):
-        class L(object):
+        class Logger(object):
             def __init__(self):
                 self.log = ''
 
             def info(self, measurement):
                 self.log += measurement
 
-        logger = L()
+        logger = Logger()
         processor = LoggingMessageProcessor(logger)
         metric = FakeMeterMetric()
         processor.meter_metrics['test'] = metric
