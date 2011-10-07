@@ -15,7 +15,7 @@ class FakeProcessor(object):
     def flush(self, interval):
         """Always produce a sequence number followed by 9 lines of output"""
         self.sequence += 1
-        return ["\n".join([str(self.sequence)] + map(str, xrange(9)))]
+        return [str(self.sequence)]
 
 
 class FakeTransport(object):
@@ -67,7 +67,7 @@ class TestGraphiteProtocol(TestCase):
         self.protocol.resumeProducing()
         self.clock.advance(1)
         self.assertEqual(1, len(self.transport.messages))
-        self.assertEqual("3", self.transport.messages[-1].splitlines()[0])
+        self.assertEqual("3", self.transport.messages[-1])
 
     def test_stopped_producer_discards_everything(self):
         """
