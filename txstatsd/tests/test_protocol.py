@@ -23,8 +23,7 @@ class FakeTransport(object):
     def __init__(self):
         self.messages = []
 
-    def writeSequence(self, sequence):
-        data, separator = sequence
+    def write(self, data):
         self.messages.append(data)
 
 
