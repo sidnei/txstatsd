@@ -21,7 +21,7 @@ class FlushMessagesTest(TestCase):
         self.assertEqual(2, len(messages))
         counters = messages[0].splitlines()
         self.assertEqual("gorets.count 17 42", counters[0])
-        self.assertEqual("statsd.numStats 1 42", messages[1])
+        self.assertEqual("statsd.numStats 1 42", messages[1].splitlines()[0])
 
     def test_flush_counter_with_prefix(self):
         """
@@ -34,7 +34,7 @@ class FlushMessagesTest(TestCase):
         self.assertEqual(2, len(messages))
         counters = messages[0].splitlines()
         self.assertEqual("test.metric.gorets.count 17 42", counters[0])
-        self.assertEqual("statsd.numStats 1 42", messages[1])
+        self.assertEqual("statsd.numStats 1 42", messages[1].splitlines()[0])
 
     def test_flush_single_timer_single_time(self):
         """
@@ -59,7 +59,7 @@ class FlushMessagesTest(TestCase):
         self.assertEqual("glork.98percentile 24.0 42", timers[7])
         self.assertEqual("glork.99percentile 24.0 42", timers[8])
         self.assertEqual("glork.999percentile 24.0 42", timers[9])
-        self.assertEqual("statsd.numStats 1 42", messages[1])
+        self.assertEqual("statsd.numStats 1 42", messages[1].splitlines()[0])
 
     def test_flush_single_timer_multiple_times(self):
         """
@@ -94,7 +94,7 @@ class FlushMessagesTest(TestCase):
         self.assertEqual("glork.98percentile 42.0 42", timers[7])
         self.assertEqual("glork.99percentile 42.0 42", timers[8])
         self.assertEqual("glork.999percentile 42.0 42", timers[9])
-        self.assertEqual("statsd.numStats 1 42", messages[1])
+        self.assertEqual("statsd.numStats 1 42", messages[1].splitlines()[0])
 
 
 class FlushMeterMetricMessagesTest(TestCase):
@@ -138,4 +138,5 @@ class FlushMeterMetricMessagesTest(TestCase):
             "test.metric.gorets.15min_rate 0.0 %s" % self.time_now,
             meter_metric[4])
         self.assertEqual(
-            "statsd.numStats 1 %s" % self.time_now, messages[1])
+            "statsd.numStats 1 %s" % self.time_now,
+            messages[1].splitlines()[0])

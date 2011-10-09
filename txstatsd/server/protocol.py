@@ -1,7 +1,8 @@
-from twisted.internet import task, defer
+from zope.interface import implements
+
+from twisted.internet import task, interfaces
 from twisted.internet.protocol import (
-    DatagramProtocol, ReconnectingClientFactory)
-from twisted.protocols.basic import LineOnlyReceiver
+    DatagramProtocol, ReconnectingClientFactory, Protocol)
 
 
 class StatsDServerProtocol(DatagramProtocol):
@@ -27,28 +28,45 @@ class StatsDServerProtocol(DatagramProtocol):
             self.processor.process(data)
 
 
-class GraphiteProtocol(LineOnlyReceiver):
+class GraphiteProtocol(Protocol):
     """A client protocol for talking to Graphite.
 
     Messages to Graphite are line-based and C{\n}-separated.
     """
 
-    delimiter = "\n"
+    implements(interfaces.IPushProducer)
 
-    def __init__(self, processor, interval):
+    def __init__(self, processor, interval, clock=None):
+        self.paused = False
         self.processor = processor
         self.interval = interval
         self.flush_task = task.LoopingCall(self.flushProcessor)
+        if clock is not None:
+            self.flush_task.clock = clock
         self.flush_task.start(self.interval / 1000, False)
 
-    @defer.inlineCallbacks
+    def connectionMade(self):
+        """
+        A connection has been made, register ourselves as a producer for the
+        bound transport.
+        """
+        self.transport.registerProducer(self, True)
+
     def flushProcessor(self):
         """Flush messages queued in the processor to Graphite."""
         for message in self.processor.flush(interval=self.interval):
-            for line in message.splitlines():
-                if self.connected:
-                    self.sendLine(line)
-                yield
+            if self.connected and not self.paused:
+                self.transport.write(message)
+
+    def pauseProducing(self):
+        """Pause producing messages, since the buffer is full."""
+        self.paused = True
+
+    stopProducing = pauseProducing
+
+    def resumeProducing(self):
+        """We can write to the transport again. Yay!."""
+        self.paused = False
 
 
 class GraphiteClientFactory(ReconnectingClientFactory):
