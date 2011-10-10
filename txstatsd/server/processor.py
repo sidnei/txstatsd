@@ -192,7 +192,7 @@ class MessageProcessor(object):
             messages.extend(meter_metrics)
             num_stats += events
 
-        messages.append("statsd.numStats %s %s\n" % (num_stats, timestamp))
+        self.flush_metrics_summary(messages, num_stats, timestamp)
         return messages
 
     def flush_counter_metrics(self, interval, timestamp):
@@ -277,6 +277,9 @@ class MessageProcessor(object):
             events += 1
 
         return (metrics, events)
+
+    def flush_metrics_summary(self, messages, num_stats, timestamp):
+        messages.append("statsd.numStats %s %s\n" % (num_stats, timestamp))
 
     def update_metrics(self):
         for metric in self.meter_metrics.itervalues():
