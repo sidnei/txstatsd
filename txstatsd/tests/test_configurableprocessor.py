@@ -34,7 +34,8 @@ class FlushMessagesTest(TestCase):
         self.assertEqual(2, len(messages))
         counters = messages[0].splitlines()
         self.assertEqual("test.metric.gorets.count 17 42", counters[0])
-        self.assertEqual("statsd.numStats 1 42", messages[1].splitlines()[0])
+        self.assertEqual("test.metric.statsd.numStats 1 42",
+                         messages[1].splitlines()[0])
 
     def test_flush_single_timer_single_time(self):
         """
@@ -138,5 +139,5 @@ class FlushMeterMetricMessagesTest(TestCase):
             "test.metric.gorets.15min_rate 0.0 %s" % self.time_now,
             meter_metric[4])
         self.assertEqual(
-            "statsd.numStats 1 %s" % self.time_now,
+            "test.metric.statsd.numStats 1 %s" % self.time_now,
             messages[1].splitlines()[0])
