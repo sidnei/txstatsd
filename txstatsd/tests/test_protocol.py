@@ -1,10 +1,10 @@
 """Tests for the Graphite Protocol classes."""
 
+from twisted.internet import reactor, task
+from twisted.test import proto_helpers
 from twisted.trial.unittest import TestCase
 
 from txstatsd.server.protocol import GraphiteProtocol, GraphiteClientFactory
-from twisted.internet import task
-from twisted.test import proto_helpers
 
 
 class FakeProcessor(object):
@@ -34,7 +34,8 @@ class TestGraphiteProtocol(TestCase):
         self.processor = FakeProcessor()
         self.transport = FakeTransport()
         self.clock = task.Clock()
-        self.protocol = GraphiteProtocol(self.processor, 1000, clock=self.clock)
+        self.protocol = GraphiteProtocol(self.processor, 1000,
+                                         clock=self.clock)
         self.protocol.transport = self.transport
         self.protocol.connected = True
 
@@ -45,12 +46,12 @@ class TestGraphiteProtocol(TestCase):
         """
         self.assertEqual(0, len(self.transport.messages))
         self.clock.advance(1)
-        self.assertEqual(1, len(self.transport.messages))
-        self.clock.advance(1)
         self.assertEqual(2, len(self.transport.messages))
+        self.clock.advance(1)
+        self.assertEqual(4, len(self.transport.messages))
         self.protocol.pauseProducing()
         self.clock.advance(1)
-        self.assertEqual(2, len(self.transport.messages))
+        self.assertEqual(4, len(self.transport.messages))
         
     def test_paused_producer_discards_everything_until_resumed(self):
         """
@@ -65,8 +66,9 @@ class TestGraphiteProtocol(TestCase):
         self.assertEqual(0, len(self.transport.messages))
         self.protocol.resumeProducing()
         self.clock.advance(1)
-        self.assertEqual(1, len(self.transport.messages))
-        self.assertEqual("3", self.transport.messages[-1])
+        self.assertEqual(2, len(self.transport.messages))
+        # Last message is the message graphite metric.
+        self.assertEqual("3", self.transport.messages[-2])
 
     def test_stopped_producer_discards_everything(self):
         """
@@ -74,12 +76,12 @@ class TestGraphiteProtocol(TestCase):
         """
         self.assertEqual(0, len(self.transport.messages))
         self.clock.advance(1)
-        self.assertEqual(1, len(self.transport.messages))
+        self.assertEqual(2, len(self.transport.messages))
         self.protocol.stopProducing()
         self.clock.advance(1)
-        self.assertEqual(1, len(self.transport.messages))
+        self.assertEqual(2, len(self.transport.messages))
         self.clock.advance(1)
-        self.assertEqual(1, len(self.transport.messages))
+        self.assertEqual(2, len(self.transport.messages))
 
 
 class TestProducerRegistration(TestCase):
@@ -102,3 +104,43 @@ class TestProducerRegistration(TestCase):
         # check the streaming attribute
         self.assertTrue(clientTransport.streaming)
         client.flush_task.stop()
+
+
+class Logger(object):
+    def __init__(self):
+        self.log = None
+
+    def info(self, message):
+        self.log = message
+
+
+class TestPausedMessagingLogging(TestCase):
+
+    def setUp(self):
+        super(TestPausedMessagingLogging, self).setUp()
+        self.processor = FakeProcessor()
+        self.transport = FakeTransport()
+        self.clock = task.Clock()
+        self.logger = Logger()
+        self.protocol = GraphiteProtocol(self.processor, 1000,
+                                         clock=self.clock, logger=self.logger)
+        self.protocol.transport = self.transport
+        self.protocol.connected = True
+
+    def test_paused_producer_logging(self):
+        """Ensure we log the pausing of messaging to Graphite."""
+        def logged(message):
+            self.assertEqual(self.logger.log, message)
+
+        self.protocol.stopProducing()
+        return task.deferLater(reactor, 0.2, logged,
+                               'Paused messaging Graphite')
+
+    def test_resumed_producer_logging(self):
+        """Ensure we log the resumption of messaging to Graphite."""
+        def logged(message):
+            self.assertEqual(self.logger.log, message)
+
+        self.protocol.resumeProducing()
+        return task.deferLater(reactor, 0.2, logged,
+                               'Resumed messaging Graphite')

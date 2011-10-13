@@ -168,7 +168,8 @@ def createService(options):
     metrics_updater.setServiceParent(service)
     metrics_updater.schedule(processor.update_metrics, 5, None)
 
-    factory = GraphiteClientFactory(processor, options["flush-interval"])
+    factory = GraphiteClientFactory(processor, options["flush-interval"],
+                                    prefix=prefix)
     client = TCPClient(options["carbon-cache-host"],
                        options["carbon-cache-port"],
                        factory)
