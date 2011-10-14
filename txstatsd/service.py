@@ -1,4 +1,7 @@
+
+import getopt
 import socket
+import sys
 import ConfigParser
 
 from twisted.application.internet import TCPClient, UDPServer
@@ -11,74 +14,99 @@ from txstatsd.client import InternalClient
 from txstatsd.metrics.metrics import Metrics
 from txstatsd.server.processor import MessageProcessor
 from txstatsd.server.configurableprocessor import ConfigurableMessageProcessor
-from txstatsd.server.protocol import GraphiteClientFactory, StatsDServerProtocol
+from txstatsd.server.protocol import (
+    GraphiteClientFactory, StatsDServerProtocol)
 from txstatsd.report import ReportingService
 
-_unset = object()
+
+def accumulateClassList(classObj, attr, listObj,
+                        baseClass=None, excludeClass=None):
+    """Accumulate all attributes of a given name in a class hierarchy 
+    into a single list.
+
+    Assuming all class attributes of this name are lists.
+    """
+    for base in classObj.__bases__:
+        accumulateClassList(base, attr, listObj, excludeClass=excludeClass)
+    if excludeClass != classObj:
+        if baseClass is None or baseClass in classObj.__bases__:
+            listObj.extend(classObj.__dict__.get(attr, []))
 
 
 class OptionsGlue(usage.Options):
-    """
-    Extends usage.Options to also read parameters from a config file.
-    """
+    """Extends usage.Options to also read parameters from a config file."""
 
-    optParameters = []
+    optParameters = [
+        ["config", "c", None, "Config file to use."]
+    ]
 
     def __init__(self):
-        self.glue_defaults = {}
-        self._config_file = None
-        config = ["config", "c", None, "Config file to use."]
-
-        new_params = []
-
-        def process_parameter(parameter):
-            long, short, default, doc, paramType = util.padTo(5, parameter)
-            self.glue_defaults[long] = default
-            new_params.append(
-                [long, short, _unset, doc, paramType])
-
-        for parameter in self.glue_parameters:
+        parameters = []
+        accumulateClassList(self.__class__, 'optParameters',
+                            parameters, excludeClass=OptionsGlue)
+        for parameter in parameters:
             if parameter[0] == "config" or parameter[1] == "c":
                 raise ValueError("the --config/-c parameter is reserved.")
-            process_parameter(parameter)
-        process_parameter(config)
 
-        # we need to change self.__class__.optParameters as usage.Options
-        # will collect the config from there, not self.optParameters:
-        # reflect.accumulateClassList(self.__class__, 'optParameters',
-        #                            parameters)
-        self.__class__.optParameters = new_params
+        self.overridden_options = []
 
         super(OptionsGlue, self).__init__()
 
-    def __getitem__(self, item):
-        result = super(OptionsGlue, self).__getitem__(item)
-        if result is not _unset:
-            return result
+    def opt_config(self, config_path):
+        self['config'] = config_path
 
-        fname = super(OptionsGlue, self).__getitem__("config")
-        if fname is not _unset:
-            self._config_file = ConfigParser.RawConfigParser()
-            self._config_file.read(fname)
+    opt_c = opt_config
 
-        if self._config_file is not None:
-            try:
-                result = self._config_file.get("statsd", item)
-            except ConfigParser.NoOptionError:
-                pass
+    def parseOptions(self, options=None):
+        """Obtain overridden options."""
+
+        if options is None:
+            options = sys.argv[1:]
+        try:
+            opts, args = getopt.getopt(options,
+                                       self.shortOpt, self.longOpt)
+        except getopt.error, e:
+            raise usage.UsageError(str(e))
+
+        for opt, arg in opts:
+            if opt[1] == '-':
+                opt = opt[2:]
             else:
-                if item in self._dispatch:
-                    result = self._dispatch[item].coerce(result)
-                return result
+                opt = opt[1:]
+            self.overridden_options.append(opt)
 
-        return self.glue_defaults[item]
+        super(OptionsGlue, self).parseOptions(options=options)
+
+    def postOptions(self):
+        """Read the configuration file if one is provided."""
+        if self['config'] is not None:
+            config_file = ConfigParser.RawConfigParser()
+            config_file.read(self['config'])
+
+            self.configure(config_file)
+
+    def overridden_option(self, opt):
+        """Return whether this option was overridden."""
+        return opt in self.overridden_options
+
+    def configure(self, config_file):
+        """Read the configuration items, coercing types as required."""
+        for name, value in config_file.items(self.config_section):
+            # Overridden options have precedence
+            if not self.overridden_option(name):
+                # Options appends '=' when gathering the parameters
+                if (name + '=') in self.longOpt:
+                    # Coerce the type if required
+                    if name in self._dispatch:
+                        value = self._dispatch[name].coerce(value)
+                    self[name] = value
 
 
 class StatsDOptions(OptionsGlue):
     """
     The set of configuration settings for txStatsD.
     """
-    glue_parameters = [
+    optParameters = [
         ["carbon-cache-host", "h", "localhost",
          "The host where carbon cache is listening."],
         ["carbon-cache-port", "p", 2003,
@@ -87,7 +115,7 @@ class StatsDOptions(OptionsGlue):
          "The UDP port where we will listen.", int],
         ["flush-interval", "i", 60000,
          "The number of milliseconds between each flush.", int],
-        ["prefix", "p", None,
+        ["prefix", "x", None,
          "Prefix to use when reporting stats.", str],
         ["report", "r", None,
          "Which additional stats to report {process|net|io|system}.", str],
@@ -98,6 +126,10 @@ class StatsDOptions(OptionsGlue):
         ["statsd-compliance", "s", 1,
          "Produce StatsD-compliant messages.", int]
     ]
+
+    def __init__(self):
+        self.config_section = 'statsd'
+        super(StatsDOptions, self).__init__()
 
 
 def createService(options):

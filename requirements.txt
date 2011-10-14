@@ -1,0 +1,5 @@
+Twisted==11.0.0
+mocker==1.1
+psutil==0.3.0
+wsgiref==0.1.2
+zope.interface==3.8.0

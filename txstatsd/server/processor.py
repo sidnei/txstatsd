@@ -132,10 +132,15 @@ class MessageProcessor(object):
             return self.fail(message)
 
         try:
-            metric = [float(values[0]), key]
-            self.gauge_metrics.append(metric)
+            value = float(values[0])
         except (TypeError, ValueError):
             self.fail(message)
+
+        self.compose_gauge_metric(key, value)
+
+    def compose_gauge_metric(self, key, value):
+        metric = [value, key]
+        self.gauge_metrics.append(metric)
 
     def process_meter_metric(self, key, composite, message):
         values = composite.split(":")
@@ -187,7 +192,7 @@ class MessageProcessor(object):
             messages.extend(meter_metrics)
             num_stats += events
 
-        messages.append("statsd.numStats %s %s" % (num_stats, timestamp))
+        self.flush_metrics_summary(messages, num_stats, timestamp)
         return messages
 
     def flush_counter_metrics(self, interval, timestamp):
@@ -272,6 +277,9 @@ class MessageProcessor(object):
             events += 1
 
         return (metrics, events)
+
+    def flush_metrics_summary(self, messages, num_stats, timestamp):
+        messages.append("statsd.numStats %s %s\n" % (num_stats, timestamp))
 
     def update_metrics(self):
         for metric in self.meter_metrics.itervalues():

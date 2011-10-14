@@ -1,3 +1,4 @@
+
 import ConfigParser
 import tempfile
 from unittest import TestCase
@@ -18,30 +19,30 @@ class GlueOptionsTestCase(TestCase):
         Defaults get passed over to the instance.
         """
         class TestOptions(service.OptionsGlue):
-            glue_parameters = [["test", "t", "default", "help"]]
-
+            optParameters = [["test", "t", "default", "help"]]
+    
         o = TestOptions()
         o.parseOptions([])
         self.assertEquals("default", o["test"])
-
+    
     def test_set_parameter(self):
         """
         A parameter can be set from the command line
         """
         class TestOptions(service.OptionsGlue):
-            glue_parameters = [["test", "t", "default", "help"]]
-
+            optParameters = [["test", "t", "default", "help"]]
+    
         o = TestOptions()
         o.parseOptions(["--test", "notdefault"])
         self.assertEquals("notdefault", o["test"])
-
+    
     def test_no_config_option(self):
         """
         A parameter can be set from the command line
         """
         class TestOptions(service.OptionsGlue):
-            glue_parameters = [["config", "c", "default", "help"]]
-
+            optParameters = [["config", "c", "default", "help"]]
+    
         self.assertRaises(ValueError, lambda: TestOptions())
 
     def get_file_parser(self, glue_parameters_config=None, **kwargs):
@@ -63,7 +64,12 @@ class GlueOptionsTestCase(TestCase):
         f.flush()
 
         class TestOptions(service.OptionsGlue):
-            glue_parameters = glue_parameters_config
+            optParameters = glue_parameters_config
+
+            def __init__(self):
+                self.config_section = 'statsd'
+                super(TestOptions, self).__init__()
+
         return f, TestOptions()
 
     def test_reads_from_config(self):
