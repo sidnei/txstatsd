@@ -49,7 +49,7 @@ class GraphiteProtocol(Protocol):
         if logger is not None:
             logger_info = getattr(logger, 'info', None)
             if logger_info is None or not callable(logger_info):
-                raise TypeError()
+                raise TypeError("logger missing callable info attribute")
         self.logger = logger
 
         self.flush_task = task.LoopingCall(self.flushProcessor)
@@ -96,14 +96,16 @@ class GraphiteProtocol(Protocol):
 
     def pauseProducing(self):
         """Pause producing messages, since the buffer is full."""
-        self.log('Paused messaging Graphite')
+        time_now = int(time.time())
+        self.log('Paused messaging Graphite ' + str(time_now))
         self.paused = True
 
     stopProducing = pauseProducing
 
     def resumeProducing(self):
         """We can write to the transport again. Yay!."""
-        self.log('Resumed messaging Graphite')
+        time_now = int(time.time())
+        self.log('Resumed messaging Graphite ' + str(time_now))
         self.paused = False
 
     def log(self, message):
