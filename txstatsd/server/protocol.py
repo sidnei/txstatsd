@@ -52,15 +52,16 @@ class GraphiteProtocol(Protocol):
                 raise TypeError("logger missing callable info attribute")
         self.logger = logger
 
+        # Initial state represents being able to message Graphite.
+        self.message_graphite_metric = CounterMetricReporter(
+            'message.graphite', prefix)
+        self.total_paused_period = 0
+        self.pause_began = None
+
         self.flush_task = task.LoopingCall(self.flushProcessor)
         if clock is not None:
             self.flush_task.clock = clock
         self.flush_task.start(self.interval / 1000, False)
-
-        # Initial state represents being able to message Graphite.
-        self.message_graphite_metric = CounterMetricReporter(
-            'message.graphite', prefix)
-        self.pause_began = None
 
     def connectionMade(self):
         """
@@ -81,12 +82,12 @@ class GraphiteProtocol(Protocol):
         """Record whether we are paused or not."""
         if self.connected and not self.paused:
             if self.pause_began is None:
-                paused_period = 0
                 timestamp = int(time.time())
             else:
                 paused_period = int(time.time() - self.pause_began)
+                self.total_paused_period += paused_period
                 timestamp = int(self.pause_began)
-            self.message_graphite_metric.mark(paused_period)
+            self.message_graphite_metric.mark(self.total_paused_period)
             self.transport.write(
                 self.message_graphite_metric.report(timestamp))
             self.pause_began = None

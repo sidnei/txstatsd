@@ -130,7 +130,7 @@ class TestPausedMessagingLogging(TestCase):
     def test_paused_producer_logging(self):
         """Ensure we log the pausing of messaging to Graphite."""
         def logged(message):
-            self.assertEqual(self.logger.log, message)
+            self.assertTrue(self.logger.log.startswith(message))
 
         self.protocol.stopProducing()
         return task.deferLater(reactor, 0.2, logged,
@@ -139,7 +139,7 @@ class TestPausedMessagingLogging(TestCase):
     def test_resumed_producer_logging(self):
         """Ensure we log the resumption of messaging to Graphite."""
         def logged(message):
-            self.assertEqual(self.logger.log, message)
+            self.assertTrue(self.logger.log.startswith(message))
 
         self.protocol.resumeProducing()
         return task.deferLater(reactor, 0.2, logged,
