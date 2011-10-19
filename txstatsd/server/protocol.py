@@ -60,7 +60,6 @@ class GraphiteProtocol(Protocol):
         # Initial state represents being able to message Graphite.
         self.message_graphite_metric = CounterMetricReporter(
             'message.graphite', prefix)
-        self.message_graphite_metric.mark(1)
         self.pause_began = None
 
     def connectionMade(self):
@@ -82,17 +81,18 @@ class GraphiteProtocol(Protocol):
         """Record whether we are paused or not."""
         if self.connected and not self.paused:
             if self.pause_began is None:
+                paused_period = 0
                 timestamp = int(time.time())
             else:
+                paused_period = int(time.time() - self.pause_began)
                 timestamp = int(self.pause_began)
+            self.message_graphite_metric.mark(paused_period)
             self.transport.write(
                 self.message_graphite_metric.report(timestamp))
-            self.message_graphite_metric.mark(1)
             self.pause_began = None
         else:
             if self.pause_began is None:
                 self.pause_began = time.time()
-            self.message_graphite_metric.mark(0)
 
     def pauseProducing(self):
         """Pause producing messages, since the buffer is full."""
