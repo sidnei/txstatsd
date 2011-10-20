@@ -64,3 +64,8 @@ class TestClient(TestCase):
                           UdpStatsDClient, 'localhost', 'malformed')
         self.assertRaises(ValueError,
                           UdpStatsDClient, 0, 8000)
+
+    def test_idpstatsd_socket_nonblocking(self):
+        client = UdpStatsDClient('localhost', 8000)
+        client.connect()
+        self.assertEqual(client.socket.gettimeout(), 0.0)
