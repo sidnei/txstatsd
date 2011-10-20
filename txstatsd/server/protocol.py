@@ -1,8 +1,12 @@
+import time
+
 from zope.interface import implements
 
-from twisted.internet import task, interfaces
+from twisted.internet import interfaces, reactor, task
 from twisted.internet.protocol import (
     DatagramProtocol, ReconnectingClientFactory, Protocol)
+
+from txstatsd.metrics.countermetric import CounterMetricReporter
 
 
 class StatsDServerProtocol(DatagramProtocol):
@@ -36,10 +40,24 @@ class GraphiteProtocol(Protocol):
 
     implements(interfaces.IPushProducer)
 
-    def __init__(self, processor, interval, clock=None):
+    def __init__(self, processor, interval, clock=None,
+                logger=None, prefix=''):
         self.paused = False
         self.processor = processor
         self.interval = interval
+
+        if logger is not None:
+            logger_info = getattr(logger, 'info', None)
+            if logger_info is None or not callable(logger_info):
+                raise TypeError("logger missing callable info attribute")
+        self.logger = logger
+
+        # Initial state represents being able to message Graphite.
+        self.message_graphite_metric = CounterMetricReporter(
+            'message.graphite', prefix)
+        self.total_paused_period = 0
+        self.pause_began = None
+
         self.flush_task = task.LoopingCall(self.flushProcessor)
         if clock is not None:
             self.flush_task.clock = clock
@@ -58,23 +76,53 @@ class GraphiteProtocol(Protocol):
             if self.connected and not self.paused:
                 self.transport.write(message)
 
+        self.flush_message_graphite_metric()
+
+    def flush_message_graphite_metric(self):
+        """Record whether we are paused or not."""
+        if self.connected and not self.paused:
+            if self.pause_began is None:
+                timestamp = int(time.time())
+            else:
+                paused_period = int(time.time() - self.pause_began)
+                self.total_paused_period += paused_period
+                timestamp = int(self.pause_began)
+            self.message_graphite_metric.mark(self.total_paused_period)
+            self.transport.write(
+                self.message_graphite_metric.report(timestamp))
+            self.pause_began = None
+        else:
+            if self.pause_began is None:
+                self.pause_began = time.time()
+
     def pauseProducing(self):
         """Pause producing messages, since the buffer is full."""
+        time_now = int(time.time())
+        self.log('Paused messaging Graphite ' + str(time_now))
         self.paused = True
 
     stopProducing = pauseProducing
 
     def resumeProducing(self):
         """We can write to the transport again. Yay!."""
+        time_now = int(time.time())
+        self.log('Resumed messaging Graphite ' + str(time_now))
         self.paused = False
+
+    def log(self, message):
+        if self.logger is not None:
+            # Ensure the logging is performed on some other thread.
+            reactor.callInThread(self.logger.info, message)
 
 
 class GraphiteClientFactory(ReconnectingClientFactory):
     """A reconnecting Graphite client."""
 
-    def __init__(self, processor, interval):
+    def __init__(self, processor, interval, logger=None, prefix=''):
         self.processor = processor
         self.interval = interval
+        self.prefix = prefix
+        self.logger = logger
 
     def buildProtocol(self, addr):
         """
@@ -82,6 +130,7 @@ class GraphiteClientFactory(ReconnectingClientFactory):
         L{MessageProcessor}.
         """
         self.resetDelay()
-        protocol = GraphiteProtocol(self.processor, self.interval)
+        protocol = GraphiteProtocol(self.processor, self.interval,
+                                    logger=self.logger, prefix=self.prefix)
         protocol.factory = self
         return protocol
