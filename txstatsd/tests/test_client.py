@@ -65,7 +65,9 @@ class TestClient(TestCase):
         self.assertRaises(ValueError,
                           UdpStatsDClient, 0, 8000)
 
-    def test_idpstatsd_socket_nonblocking(self):
+    def test_udpstatsd_socket_nonblocking(self):
         client = UdpStatsDClient('localhost', 8000)
         client.connect()
+        # According to the python docs (and the source, I've checked)
+        # setblocking(0) is the same as settimeout(0.0).
         self.assertEqual(client.socket.gettimeout(), 0.0)
