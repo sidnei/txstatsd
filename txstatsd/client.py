@@ -62,7 +62,7 @@ class TwistedStatsDClient(object):
 
     def write(self, data, callback=None):
         """Send the metric to the StatsD server.
-                
+
         @param data: The data to be sent.
         @param callback: The callback to which the result should be sent.
             B{Note}: The C{callback} will be called in the C{reactor}
@@ -72,7 +72,7 @@ class TwistedStatsDClient(object):
 
     def _write(self, data, callback):
         """Send the metric to the StatsD server.
-                
+
         @param data: The data to be sent.
         @param callback: The callback to which the result should be sent.
         @raise twisted.internet.error.MessageLengthError: If the size of data
@@ -113,6 +113,7 @@ class UdpStatsDClient(object):
     def connect(self):
         """Connect to the StatsD server."""
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        self.socket.setblocking(0)
 
     def disconnect(self):
         """Disconnect from the StatsD server."""
