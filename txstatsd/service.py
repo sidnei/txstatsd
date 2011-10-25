@@ -6,10 +6,8 @@ import ConfigParser
 
 from twisted.application.internet import TCPClient, UDPServer
 from twisted.application.service import MultiService
-from twisted.internet import reactor
-from twisted.python import usage, util
+from twisted.python import usage
 
-from txstatsd import process
 from txstatsd.client import InternalClient
 from txstatsd.metrics.metrics import Metrics
 from txstatsd.server.processor import MessageProcessor
@@ -152,6 +150,9 @@ def createService(options):
         metrics = Metrics(connection)
 
     if options["report"] is not None:
+        from txstatsd import process
+        from twisted.internet import reactor
+
         reporting = ReportingService()
         reporting.setServiceParent(service)
         reporting.schedule(
