@@ -1,6 +1,7 @@
 
 from txstatsd.metrics.gaugemetric import GaugeMetric
 from txstatsd.metrics.metermetric import MeterMetric
+from txstatsd.metrics.distinctmetric import DistinctMetric
 from txstatsd.metrics.metric import Metric
 
 
@@ -69,6 +70,13 @@ class Metrics(object):
             self._metrics[name] = metric
         self._metrics[name].send("%s|ms" % duration)
 
+    def distinct(self, name, item):
+        name = self.fully_qualify_name(name)
+        if not name in self._metrics:
+            metric = DistinctMetric(self.connection, name)
+            self._metrics[name] = metric
+        self._metrics[name].mark(item)
+        
     def clear(self, name):
         """Allow the metric to re-initialize its internal state."""
         name = self.fully_qualify_name(name)

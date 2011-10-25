@@ -6,6 +6,7 @@ import logging
 from twisted.python import log
 
 from txstatsd.metrics.metermetric import MeterMetricReporter
+from txstatsd.metrics.distinctmetric import DistinctMetricReporter
 
 
 SPACES = re.compile("\s+")
@@ -60,6 +61,7 @@ class MessageProcessor(object):
         self.counter_metrics = {}
         self.gauge_metrics = deque()
         self.meter_metrics = {}
+        self.distinct_metrics = {}
 
     def fail(self, message):
         """Log and discard malformed message."""
@@ -91,9 +93,21 @@ class MessageProcessor(object):
             self.process_gauge_metric(key, fields[0], message)
         elif fields[1] == "m":
             self.process_meter_metric(key, fields[0], message)
+        elif fields[1] == "distinct":
+            self.process_distinct_metric(key, fields[0], message)            
         else:
             return self.fail(message)
 
+    def process_distinct_metric(self, key, item, message):
+        self.compose_distinct_metric(key, str(item))
+        
+    def compose_distinct_metric(self, key, item):
+        if not key in self.distinct_metrics:
+            metric = DistinctMetricReporter(key, self.time_function,
+                                         prefix="stats.distinct")
+            self.distinct_metrics[key] = metric
+        self.distinct_metrics[key].update(item)
+    
     def process_timer_metric(self, key, duration, message):
         try:
             duration = float(duration)
@@ -192,6 +206,11 @@ class MessageProcessor(object):
             messages.extend(meter_metrics)
             num_stats += events
 
+        distinct_metrics, events = self.flush_distinct_metrics(timestamp)
+        if events > 0:
+            messages.extend(distinct_metrics)
+            num_stats += events
+            
         self.flush_metrics_summary(messages, num_stats, timestamp)
         return messages
 
@@ -278,6 +297,16 @@ class MessageProcessor(object):
 
         return (metrics, events)
 
+    def flush_distinct_metrics(self, timestamp):
+        metrics = []
+        events = 0
+        for metric in self.distinct_metrics.itervalues():
+            message = metric.report(timestamp)
+            metrics.append(message)
+            events += 1
+
+        return (metrics, events)
+        
     def flush_metrics_summary(self, messages, num_stats, timestamp):
         messages.append("statsd.numStats %s %s\n" % (num_stats, timestamp))
 
