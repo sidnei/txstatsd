@@ -1,17 +1,30 @@
 # Copyright (C) 2011 Canonical
 # All Rights Reserved
+"""
+Implements a probabilistic distinct counter with sliding windows.
+
+Based on:
+http://citeseerx.ist.psu.edu/viewdoc/summary?doi=10.1.1.12.7100
+
+And extended for sliding windows.
+"""
 import random
 import time
-import uuid
 
 from string import Template
 
 from txstatsd.metrics.metric import Metric
-from txstatsd.stats.exponentiallydecayingsample \
-    import ExponentiallyDecayingSample
 
    
 class SBoxHash(object):
+    """A very fast hash.
+    
+    This class create a random hash function that is very fast.
+    Based on SBOXes. Not Crypto Strong.
+    
+    Two instances of this class will hash differently.
+    """
+    
     def __init__(self):
         self.table = [random.randint(0, 0xFFFFFFFF - 1) for i in range(256)]
         
@@ -25,11 +38,13 @@ class SBoxHash(object):
     
         
 def hash(data):
+    """Hash data using a random hasher."""
     p = SBoxHash()
     return p.hash(data)
     
     
 def zeros(n):
+    """Count the zeros to the right of the binary representation of n."""
     count = 0
     i = 0
     while True:
@@ -44,6 +59,7 @@ def zeros(n):
 
 
 class SlidingDistinctCounter(object):
+    """A probabilistic distinct counter with sliding windows."""
     def __init__(self, n_hashes, n_buckets):
         self.n_hashes = n_hashes
         self.n_buckets = n_buckets

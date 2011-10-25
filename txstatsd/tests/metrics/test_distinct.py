@@ -1,8 +1,6 @@
 # Copyright (C) 2011 Canonical
 # All Rights Reserved
 import random
-import math
-import time
 
 from scipy.stats import chi2
 
@@ -57,12 +55,9 @@ class TestDistinc(TestCase):
         
         for r in [1000, 10000]:
             cd = distinct.SlidingDistinctCounter(32, 32)
-            t = time.time()
             for i in range(r):
                 cd.add(1, str(i))
             error = abs(cd.distinct() - r)
-            d = time.time() - t
-            rate = int(r / d)
             self.assertTrue(error < 0.15 * r)
         
         
@@ -83,4 +78,3 @@ class TestDistinctMetricReporter(TestCase):
         self.assertTrue(abs(dmr.count_1hour(now) - 72) < 15)
         self.assertTrue(abs(dmr.count_1day(now) - 1728) < 500)
         self.assertTrue("count_1hour" in dmr.report(now))
-        
