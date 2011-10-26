@@ -93,7 +93,7 @@ class MessageProcessor(object):
             self.process_gauge_metric(key, fields[0], message)
         elif fields[1] == "m":
             self.process_meter_metric(key, fields[0], message)
-        elif fields[1] == "distinct":
+        elif fields[1] == "d":
             self.process_distinct_metric(key, fields[0], message)            
         else:
             return self.fail(message)

@@ -94,7 +94,7 @@ class DistinctMetric(Metric):
 
     def mark(self, item):
         """Report this item was seen."""
-        self.send("%s|distinct" % item)
+        self.send("%s|d" % item)
 
 
 class DistinctMetricReporter(object):

@@ -66,10 +66,10 @@ class ProcessMessagesTest(TestCase):
     def test_receive_distinct_metric(self):
         """
         A distinct metric message takes the form:
-        '<name>:<item>|distinct'.
+        '<name>:<item>|d'.
         'distinct' indicates this is a distinct metric message.
         """
-        self.processor.process("gorets:one|distinct")
+        self.processor.process("gorets:one|d")
         self.assertEqual(1, len(self.processor.distinct_metrics))
         self.assertTrue(self.processor.distinct_metrics["gorets"].count() > 0)
 
@@ -243,7 +243,7 @@ class FlushMessagesTest(TestCase):
         a distinct metric.
         """
 
-        self.processor.process("gorets:item|distinct")
+        self.processor.process("gorets:item|d")
         
         messages = self.processor.flush()
         self.assertEqual(2, len(messages))
