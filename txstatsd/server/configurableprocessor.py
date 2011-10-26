@@ -71,6 +71,13 @@ class ConfigurableMessageProcessor(MessageProcessor):
             self.meter_metrics[key] = metric
         self.meter_metrics[key].mark(value)
 
+    def compose_distinct_metric(self, key, item):
+        if not key in self.distinct_metrics:
+            metric = DistinctMetricReporter(key, self.time_function,
+                                         prefix=self.message_prefix)
+            self.distinct_metrics[key] = metric
+        self.distinct_metrics[key].update(item)
+        
     def flush_counter_metrics(self, interval, timestamp):
         metrics = []
         events = 0

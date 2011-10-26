@@ -63,6 +63,16 @@ class ProcessMessagesTest(TestCase):
             [9.6, 'gorets'],
             self.processor.gauge_metrics.pop())
 
+    def test_receive_distinct_metric(self):
+        """
+        A distinct metric message takes the form:
+        '<name>:<item>|d'.
+        'distinct' indicates this is a distinct metric message.
+        """
+        self.processor.process("gorets:one|d")
+        self.assertEqual(1, len(self.processor.distinct_metrics))
+        self.assertTrue(self.processor.distinct_metrics["gorets"].count() > 0)
+
     def test_receive_message_no_fields(self):
         """
         If a timer message has no fields, it is logged and discarded.
@@ -226,6 +236,22 @@ class FlushMessagesTest(TestCase):
         self.assertEqual(
             "statsd.numStats 1 42", messages[1].splitlines()[0])
         self.assertEqual(0, len(self.processor.gauge_metrics))
+
+    def test_flush_distinct_metric(self):
+        """
+        Test the correct rendering of the Graphite report for
+        a distinct metric.
+        """
+
+        self.processor.process("gorets:item|d")
+        
+        messages = self.processor.flush()
+        self.assertEqual(2, len(messages))
+        metrics = messages[0]
+        self.assertTrue("stats.distinct.gorets.count " in metrics)
+        self.assertTrue("stats.distinct.gorets.count_1hour" in metrics)
+        self.assertTrue("stats.distinct.gorets.count_1min" in metrics)
+        self.assertTrue("stats.distinct.gorets.count_1day" in metrics)
 
 
 class FlushMeterMetricMessagesTest(TestCase):
