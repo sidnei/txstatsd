@@ -67,7 +67,7 @@ class ProcessMessagesTest(TestCase):
         """
         A distinct metric message takes the form:
         '<name>:<item>|distinct'.
-        'distinct' indicates this is a gauge metric message.
+        'distinct' indicates this is a distinct metric message.
         """
         self.processor.process("gorets:one|distinct")
         self.assertEqual(1, len(self.processor.distinct_metrics))
@@ -240,7 +240,7 @@ class FlushMessagesTest(TestCase):
     def test_flush_distinct_metric(self):
         """
         Test the correct rendering of the Graphite report for
-        a gauge metric.
+        a distinct metric.
         """
 
         self.processor.process("gorets:item|distinct")

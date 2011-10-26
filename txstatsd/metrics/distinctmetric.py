@@ -60,6 +60,7 @@ def zeros(n):
 
 class SlidingDistinctCounter(object):
     """A probabilistic distinct counter with sliding windows."""
+    
     def __init__(self, n_hashes, n_buckets):
         self.n_hashes = n_hashes
         self.n_buckets = n_buckets
@@ -68,7 +69,7 @@ class SlidingDistinctCounter(object):
         self.buckets = [[0] * n_buckets for i in range(n_hashes)]
         
     def add(self, when, item):
-        hashes = [h.hash(item) for h in self.hashes]
+        hashes = (h.hash(item) for h in self.hashes)
         for i, value in enumerate(hashes):
             self.buckets[i][min(self.n_buckets - 1, zeros(value))] = when
     

@@ -49,7 +49,7 @@ class TestZeros(TestCase):
         self.assertEquals(distinct.zeros(8), 3)
         self.assertEquals(distinct.zeros(9), 0)
         
-class TestDistinc(TestCase):
+class TestDistinct(TestCase):
     def test_all(self):
         random.seed(1)
         
