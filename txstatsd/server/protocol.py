@@ -2,7 +2,7 @@ import time
 
 from zope.interface import implements
 
-from twisted.internet import interfaces, reactor, task
+from twisted.internet import interfaces, task
 from twisted.internet.protocol import (
     DatagramProtocol, ReconnectingClientFactory, Protocol)
 
@@ -42,6 +42,9 @@ class GraphiteProtocol(Protocol):
 
     def __init__(self, processor, interval, clock=None,
                 logger=None, prefix=''):
+        from twisted.internet import reactor
+
+        self.reactor = reactor
         self.paused = False
         self.processor = processor
         self.interval = interval
@@ -112,7 +115,7 @@ class GraphiteProtocol(Protocol):
     def log(self, message):
         if self.logger is not None:
             # Ensure the logging is performed on some other thread.
-            reactor.callInThread(self.logger.info, message)
+            self.reactor.callInThread(self.logger.info, message)
 
 
 class GraphiteClientFactory(ReconnectingClientFactory):

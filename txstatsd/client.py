@@ -1,6 +1,5 @@
 import socket
 
-from twisted.internet import reactor
 from twisted.internet.protocol import DatagramProtocol
 
 
@@ -35,11 +34,13 @@ class TwistedStatsDClient(object):
         @param connect_callback: The callback to invoke on connection.
         @param disconnect_callback: The callback to invoke on disconnection.
         """
+        from twisted.internet import reactor
 
         # Twisted currently does not offer an asynchronous
         # getaddrinfo-like functionality
         # (http://twistedmatrix.com/trac/ticket/4362).
         # See UdpStatsDClient.
+        self.reactor = reactor
         self.host = host
         self.port = port
         self.connect_callback = connect_callback
@@ -68,7 +69,7 @@ class TwistedStatsDClient(object):
             B{Note}: The C{callback} will be called in the C{reactor}
             thread, and not in the thread of the original caller.
         """
-        reactor.callFromThread(self._write, data, callback)
+        self.reactor.callFromThread(self._write, data, callback)
 
     def _write(self, data, callback):
         """Send the metric to the StatsD server.
