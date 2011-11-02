@@ -2,6 +2,7 @@
 
 from twisted.internet import reactor
 from twisted.internet.defer import inlineCallbacks, Deferred
+from twisted.python import log
 from twisted.trial.unittest import TestCase
 
 from txstatsd.client import (
@@ -37,7 +38,7 @@ class TestClient(TestCase):
         return d
 
     @inlineCallbacks
-    def test_twistedstatsd_with_malformed_address(self):
+    def test_twistedstatsd_with_malformed_address_and_errback(self):
         def ensure_exception_raised(ignore):
             self.assertTrue(self.exception.startswith("DNS lookup failed"))
 
@@ -53,9 +54,26 @@ class TestClient(TestCase):
         reactor.callLater(.5, d.callback, None)
         yield d
 
+    @inlineCallbacks
+    def test_twistedstatsd_with_malformed_address_and_no_errback(self):
+        def ensure_exception_raised(ignore):
+            self.assertTrue(self.exception.startswith("DNS lookup failed"))
+
+        def capture_exception_raised(failure):
+            self.exception = failure.getErrorMessage()
+
+        self.patch(log, "err", capture_exception_raised)
+
+        yield TwistedStatsDClient('256.0.0.0', 1)
+
+        d = Deferred()
+        d.addCallback(ensure_exception_raised)
+        reactor.callLater(.5, d.callback, None)
+        yield d
+
     def test_udpstatsd_wellformed_address(self):
         client = UdpStatsDClient('localhost', 8000)
-        self.assertEqual(client.host, 'localhost')
+        self.assertEqual(client.host, '127.0.0.1')
         client = UdpStatsDClient(None, None)
         self.assertEqual(client.host, None)
 
