@@ -1,7 +1,7 @@
 """Tests for the various client classes."""
 
 from twisted.internet import reactor
-from twisted.internet.defer import Deferred
+from twisted.internet.defer import inlineCallbacks, Deferred
 from twisted.trial.unittest import TestCase
 
 from txstatsd.client import (
@@ -13,6 +13,7 @@ class TestClient(TestCase):
     def setUp(self):
         super(TestClient, self).setUp()
         self.client = None
+        self.exception = None
 
     def tearDown(self):
         if self.client:
@@ -35,21 +36,22 @@ class TestClient(TestCase):
         reactor.callWhenRunning(exercise, d.callback)
         return d
 
-    def test_twistedstatsd_write_with_malformed_address(self):
-        self.client = TwistedStatsDClient('256.0.0.0', 1)
-        protocol = StatsDClientProtocol(self.client)
-        reactor.listenUDP(0, protocol)
+    @inlineCallbacks
+    def test_twistedstatsd_with_malformed_address(self):
+        def ensure_exception_raised(ignore):
+            self.assertTrue(self.exception.startswith("DNS lookup failed"))
 
-        def ensure_bytes_sent(bytes_sent):
-            self.assertEqual(bytes_sent, None)
+        def capture_exception_raised(failure):
+            self.exception = failure.getErrorMessage()
 
-        def exercise(callback):
-            self.client.write('message', callback=callback)
+        yield TwistedStatsDClient(
+            '256.0.0.0', 1,
+            resolver_errback=capture_exception_raised)
 
         d = Deferred()
-        d.addCallback(ensure_bytes_sent)
-        reactor.callWhenRunning(exercise, d.callback)
-        return d
+        d.addCallback(ensure_exception_raised)
+        reactor.callLater(.5, d.callback, None)
+        yield d
 
     def test_udpstatsd_wellformed_address(self):
         client = UdpStatsDClient('localhost', 8000)

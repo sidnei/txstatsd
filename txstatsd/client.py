@@ -1,5 +1,6 @@
 import socket
 
+from twisted.internet.defer import inlineCallbacks
 from twisted.internet.protocol import DatagramProtocol
 
 
@@ -23,7 +24,9 @@ class StatsDClientProtocol(DatagramProtocol):
 
 class TwistedStatsDClient(object):
 
-    def __init__(self, host, port, connect_callback=None,
+    def __init__(self, host, port,
+                 resolver_errback=None,
+                 connect_callback=None,
                  disconnect_callback=None):
         """
         Build a connection that reports to the endpoint (on C{host} and
@@ -31,17 +34,23 @@ class TwistedStatsDClient(object):
 
         @param host: The StatsD server host.
         @param port: The StatsD server port.
+        @param resolver_errback: The errback to invoke should
+            issues occur resolving the supplied C{host}.
         @param connect_callback: The callback to invoke on connection.
         @param disconnect_callback: The callback to invoke on disconnection.
         """
         from twisted.internet import reactor
 
-        # Twisted currently does not offer an asynchronous
-        # getaddrinfo-like functionality
-        # (http://twistedmatrix.com/trac/ticket/4362).
-        # See UdpStatsDClient.
         self.reactor = reactor
-        self.host = host
+
+        @inlineCallbacks
+        def resolve(host):
+            self.host = yield reactor.resolve(host)
+
+        self.host = None
+        d = resolve(host)
+        d.addErrback(resolver_errback)
+
         self.port = port
         self.connect_callback = connect_callback
         self.disconnect_callback = disconnect_callback
