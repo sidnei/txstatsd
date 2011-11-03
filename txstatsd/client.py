@@ -1,6 +1,6 @@
 import socket
 
-from twisted.internet.defer import inlineCallbacks
+from twisted.internet.defer import inlineCallbacks, returnValue
 from twisted.internet.protocol import DatagramProtocol
 from twisted.python import log
 
@@ -35,10 +35,10 @@ class TwistedStatsDClient(object):
 
         @param host: The StatsD server host.
         @param port: The StatsD server port.
-        @param connect_callback: The callback to invoke on connection.
-        @param disconnect_callback: The callback to invoke on disconnection.
         @param resolver_errback: The errback to invoke should
             issues occur resolving the supplied C{host}.
+        @param connect_callback: The callback to invoke on connection.
+        @param disconnect_callback: The callback to invoke on disconnection.
         """
         from twisted.internet import reactor
 
@@ -47,13 +47,14 @@ class TwistedStatsDClient(object):
         @inlineCallbacks
         def resolve(host):
             self.host = yield reactor.resolve(host)
+            returnValue(self.host)
 
         self.host = None
-        d = resolve(host)
+        self.resolver = resolve(host)
         if resolver_errback is None:
-            d.addErrback(log.err)
+            self.resolver.addErrback(log.err)
         else:
-            d.addErrback(resolver_errback)
+            self.resolver.addErrback(resolver_errback)
 
         self.port = port
         self.connect_callback = connect_callback
@@ -61,12 +62,15 @@ class TwistedStatsDClient(object):
 
         self.transport = None
 
+    @inlineCallbacks
     def connect(self, transport=None):
         """Connect to the StatsD server."""
-        self.transport = transport
-        if self.transport is not None:
-            if self.connect_callback is not None:
-                self.connect_callback()
+        host = yield self.resolver
+        if host is not None:
+            self.transport = transport
+            if self.transport is not None:
+                if self.connect_callback is not None:
+                    self.connect_callback()
 
     def disconnect(self):
         """Disconnect from the StatsD server."""
