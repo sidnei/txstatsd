@@ -1,6 +1,8 @@
 import socket
 
+from twisted.internet.defer import inlineCallbacks, returnValue
 from twisted.internet.protocol import DatagramProtocol
+from twisted.python import log
 
 
 class StatsDClientProtocol(DatagramProtocol):
@@ -23,37 +25,52 @@ class StatsDClientProtocol(DatagramProtocol):
 
 class TwistedStatsDClient(object):
 
-    def __init__(self, host, port, connect_callback=None,
-                 disconnect_callback=None):
+    def __init__(self, host, port,
+                 connect_callback=None,
+                 disconnect_callback=None,
+                 resolver_errback=None):
         """
         Build a connection that reports to the endpoint (on C{host} and
         C{port}) using UDP.
 
         @param host: The StatsD server host.
         @param port: The StatsD server port.
+        @param resolver_errback: The errback to invoke should
+            issues occur resolving the supplied C{host}.
         @param connect_callback: The callback to invoke on connection.
         @param disconnect_callback: The callback to invoke on disconnection.
         """
         from twisted.internet import reactor
 
-        # Twisted currently does not offer an asynchronous
-        # getaddrinfo-like functionality
-        # (http://twistedmatrix.com/trac/ticket/4362).
-        # See UdpStatsDClient.
         self.reactor = reactor
-        self.host = host
+
+        @inlineCallbacks
+        def resolve(host):
+            self.host = yield reactor.resolve(host)
+            returnValue(self.host)
+
+        self.host = None
+        self.resolver = resolve(host)
+        if resolver_errback is None:
+            self.resolver.addErrback(log.err)
+        else:
+            self.resolver.addErrback(resolver_errback)
+
         self.port = port
         self.connect_callback = connect_callback
         self.disconnect_callback = disconnect_callback
 
         self.transport = None
 
+    @inlineCallbacks
     def connect(self, transport=None):
         """Connect to the StatsD server."""
-        self.transport = transport
-        if self.transport is not None:
-            if self.connect_callback is not None:
-                self.connect_callback()
+        host = yield self.resolver
+        if host is not None:
+            self.transport = transport
+            if self.transport is not None:
+                if self.connect_callback is not None:
+                    self.connect_callback()
 
     def disconnect(self):
         """Disconnect from the StatsD server."""
@@ -79,7 +96,7 @@ class TwistedStatsDClient(object):
         @raise twisted.internet.error.MessageLengthError: If the size of data
             is too large.
         """
-        if self.transport is not None:
+        if self.host is not None and self.transport is not None:
             try:
                 bytes_sent = self.transport.write(data, (self.host, self.port))
                 if callback is not None:
@@ -100,15 +117,17 @@ class UdpStatsDClient(object):
         @raise ValueError: If the C{host} and C{port} cannot be
             resolved (for the case where they are not C{None}).
         """
-        if host is not None and port is not None:
-            try:
-                socket.getaddrinfo(host, port,
-                                   socket.AF_INET, socket.SOCK_DGRAM)
-            except (TypeError, socket.error, socket.gaierror):
-                raise ValueError("The address cannot be resolved.")
-
         self.host = host
         self.port = port
+
+        if host is not None and port is not None:
+            try:
+                self.host, self.port = socket.getaddrinfo(
+                    host, port, socket.AF_INET,
+                    socket.SOCK_DGRAM, socket.SOL_UDP)[0][4]
+            except (TypeError, IndexError, socket.error, socket.gaierror):
+                raise ValueError("The address cannot be resolved.")
+
         self.socket = None
 
     def connect(self):
