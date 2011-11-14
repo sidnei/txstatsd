@@ -96,7 +96,7 @@ class TwistedStatsDClient(object):
         @raise twisted.internet.error.MessageLengthError: If the size of data
             is too large.
         """
-        if self.transport is not None:
+        if self.host is not None and self.transport is not None:
             try:
                 bytes_sent = self.transport.write(data, (self.host, self.port))
                 if callback is not None:
