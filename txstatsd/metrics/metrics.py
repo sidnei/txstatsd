@@ -30,7 +30,7 @@ class Metrics(object):
         self.namespace = namespace
         self._metrics = {}
 
-    def report(self, name, value, key, sample_rate=1):
+    def report(self, name, value, metric_type, sample_rate=1):
         """Report a generic metric.
 
         Used for server side plugins without client support.
@@ -38,7 +38,7 @@ class Metrics(object):
         name = self.fully_qualify_name(name)
         if not name in self._metrics:
             metric = GenericMetric(self.connection,
-                                        key,
+                                        metric_type,
                                         name,
                                         sample_rate)
             self._metrics[name] = metric
