@@ -7,6 +7,7 @@ import ConfigParser
 from twisted.application.internet import TCPClient, UDPServer
 from twisted.application.service import MultiService
 from twisted.python import usage
+from twisted.plugin import getPlugins
 
 from txstatsd.client import InternalClient
 from txstatsd.metrics.metrics import Metrics
@@ -15,11 +16,12 @@ from txstatsd.server.configurableprocessor import ConfigurableMessageProcessor
 from txstatsd.server.protocol import (
     GraphiteClientFactory, StatsDServerProtocol)
 from txstatsd.report import ReportingService
+from txstatsd.itxstatsd import IMetricFactory
 
 
 def accumulateClassList(classObj, attr, listObj,
                         baseClass=None, excludeClass=None):
-    """Accumulate all attributes of a given name in a class hierarchy 
+    """Accumulate all attributes of a given name in a class hierarchy
     into a single list.
 
     Assuming all class attributes of this name are lists.
@@ -35,8 +37,7 @@ class OptionsGlue(usage.Options):
     """Extends usage.Options to also read parameters from a config file."""
 
     optParameters = [
-        ["config", "c", None, "Config file to use."]
-    ]
+        ["config", "c", None, "Config file to use."]]
 
     def __init__(self):
         parameters = []
@@ -99,6 +100,10 @@ class OptionsGlue(usage.Options):
                         value = self._dispatch[name].coerce(value)
                     self[name] = value
 
+        for section in config_file.sections():
+            if section.startswith("plugin_"):
+                self[section] = config_file.items(section)
+
 
 class StatsDOptions(OptionsGlue):
     """
@@ -122,8 +127,7 @@ class StatsDOptions(OptionsGlue):
         ["monitor-response", "o", "txstatsd pong",
          "Response we should send monitoring agent.", str],
         ["statsd-compliance", "s", 1,
-         "Produce StatsD-compliant messages.", int]
-    ]
+         "Produce StatsD-compliant messages.", int]]
 
     def __init__(self):
         self.config_section = 'statsd'
@@ -140,12 +144,19 @@ def createService(options):
     if prefix is None:
         prefix = socket.gethostname() + ".statsd"
 
+    # initialize plugins
+    plugin_metrics = []
+    for plugin in getPlugins(IMetricFactory):
+        plugin.configure(options)
+        plugin_metrics.append(plugin)
+
     if options["statsd-compliance"]:
-        processor = MessageProcessor()
+        processor = MessageProcessor(plugins=plugin_metrics)
         connection = InternalClient(processor)
         metrics = Metrics(connection, namespace=prefix)
     else:
-        processor = ConfigurableMessageProcessor(message_prefix=prefix)
+        processor = ConfigurableMessageProcessor(message_prefix=prefix,
+                                                 plugins=plugin_metrics)
         connection = InternalClient(processor)
         metrics = Metrics(connection)
 

@@ -2,6 +2,7 @@
 import ConfigParser
 import tempfile
 from unittest import TestCase
+from StringIO import StringIO
 
 from twisted.internet.defer import inlineCallbacks, Deferred
 from twisted.internet.protocol import DatagramProtocol
@@ -104,6 +105,17 @@ class GlueOptionsTestCase(TestCase):
         f, o = self.get_file_parser([["number", "n", 5, "help", int]])
         o.parseOptions(["--config", f.name])
         self.assertEquals(5, o["number"])
+        
+    def test_support_plugin_sections(self):
+        class TestOptions(service.OptionsGlue):
+            optParameters = [["test", "t", "default", "help"]]
+            config_section = "statsd"
+            
+        o = TestOptions()
+        config_file = ConfigParser.RawConfigParser()
+        config_file.readfp(StringIO("[statsd]\n\n[plugin_test]\nfoo = bar\n"))
+        o.configure(config_file)
+        self.assertEquals(o["plugin_test"], config_file.items("plugin_test"))
 
 
 class Agent(DatagramProtocol):

@@ -50,7 +50,7 @@ class MessageProcessor(object):
     GAUGE_METRIC_MESSAGE = (
         "stats.gauge.%(key)s.value %(value)s %(timestamp)s\n")
 
-    def __init__(self, time_function=time.time):
+    def __init__(self, time_function=time.time, plugins=None):
         self.time_function = time_function
 
         self.counters_message = MessageProcessor.COUNTERS_MESSAGE
@@ -62,6 +62,13 @@ class MessageProcessor(object):
         self.gauge_metrics = deque()
         self.meter_metrics = {}
         self.distinct_metrics = {}
+        
+        self.plugins = {}
+        self.plugin_metrics = {}
+        
+        if plugins is not None:
+            for plugin in plugins:
+                self.plugins[plugin.metric_kind_key] = plugin
 
     def fail(self, message):
         """Log and discard malformed message."""
@@ -84,29 +91,32 @@ class MessageProcessor(object):
             return self.fail(message)
 
         key = normalize_key(key)
-
-        if fields[1] == "c":
+        metric_type = fields[1]
+        
+        if metric_type == "c":
             self.process_counter_metric(key, fields, message)
-        elif fields[1] == "ms":
+        elif metric_type == "ms":
             self.process_timer_metric(key, fields[0], message)
-        elif fields[1] == "g":
+        elif metric_type == "g":
             self.process_gauge_metric(key, fields[0], message)
-        elif fields[1] == "m":
+        elif metric_type == "m":
             self.process_meter_metric(key, fields[0], message)
-        elif fields[1] == "d":
-            self.process_distinct_metric(key, fields[0], message)            
+        elif metric_type in self.plugins:
+            self.process_plugin_metric(metric_type, key, fields, message)            
         else:
             return self.fail(message)
 
-    def process_distinct_metric(self, key, item, message):
-        self.compose_distinct_metric(key, str(item))
-        
-    def compose_distinct_metric(self, key, item):
-        if not key in self.distinct_metrics:
-            metric = DistinctMetricReporter(key, self.time_function,
-                                         prefix="stats.distinct")
-            self.distinct_metrics[key] = metric
-        self.distinct_metrics[key].update(item)
+    def get_message_prefix(self, kind):
+        return "stats." + kind
+    
+    def process_plugin_metric(self, metric_type, key, items, message):
+        if not key in self.plugin_metrics:
+            factory = self.plugins[metric_type]
+            metric = factory.build_metric(
+                self.get_message_prefix(factory.name),
+                name=key, wall_time_func=self.time_function)
+            self.plugin_metrics[key] = metric
+        self.plugin_metrics[key].process(items)
     
     def process_timer_metric(self, key, duration, message):
         try:
@@ -206,9 +216,9 @@ class MessageProcessor(object):
             messages.extend(meter_metrics)
             num_stats += events
 
-        distinct_metrics, events = self.flush_distinct_metrics(timestamp)
+        plugin_metrics, events = self.flush_plugin_metrics(interval, timestamp)
         if events > 0:
-            messages.extend(distinct_metrics)
+            messages.extend(plugin_metrics)
             num_stats += events
             
         self.flush_metrics_summary(messages, num_stats, timestamp)
@@ -297,11 +307,12 @@ class MessageProcessor(object):
 
         return (metrics, events)
 
-    def flush_distinct_metrics(self, timestamp):
+    def flush_plugin_metrics(self, interval, timestamp):
         metrics = []
         events = 0
-        for metric in self.distinct_metrics.itervalues():
-            message = metric.report(timestamp)
+
+        for metric in self.plugin_metrics.itervalues():
+            message = metric.flush(interval, timestamp)
             metrics.append(message)
             events += 1
 

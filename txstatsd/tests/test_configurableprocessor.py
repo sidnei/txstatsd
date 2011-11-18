@@ -2,8 +2,9 @@ import time
 
 from unittest import TestCase
 
-from txstatsd.server.configurableprocessor import ConfigurableMessageProcessor
+from twisted.plugins.distinct_plugin import distinct_metric_factory
 
+from txstatsd.server.configurableprocessor import ConfigurableMessageProcessor
 
 class FlushMessagesTest(TestCase):
 
@@ -36,7 +37,20 @@ class FlushMessagesTest(TestCase):
         self.assertEqual("test.metric.gorets.count 17 42", counters[0])
         self.assertEqual("test.metric.statsd.numStats 1 42",
                          messages[1].splitlines()[0])
-
+        
+    def test_flush_plugin(self):
+        """
+        Ensure the prefix features if one is supplied.
+        """
+        configurable_processor = ConfigurableMessageProcessor(
+            time_function=lambda: 42, message_prefix="test.metric",
+            plugins=[distinct_metric_factory])
+        configurable_processor.process("gorets:17|pd")
+        messages = configurable_processor.flush()
+        self.assertEqual(2, len(messages))
+        self.assertTrue("test.metric.gorets" in messages[0])
+        
+        
     def test_flush_single_timer_single_time(self):
         """
         If a single timer with a single data point is present, all

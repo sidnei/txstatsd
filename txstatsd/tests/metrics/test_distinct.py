@@ -5,8 +5,10 @@ import random
 from scipy.stats import chi2
 
 from twisted.trial.unittest import TestCase
-
+from twisted.plugin import getPlugins
+from twisted.plugins import distinct_plugin
 import txstatsd.metrics.distinctmetric as distinct
+from txstatsd.itxstatsd import IMetricFactory
 
 
 class TestHash(TestCase):        
@@ -77,4 +79,12 @@ class TestDistinctMetricReporter(TestCase):
         self.assertTrue(abs(dmr.count_1min(now) - 1) < 2)
         self.assertTrue(abs(dmr.count_1hour(now) - 72) < 15)
         self.assertTrue(abs(dmr.count_1day(now) - 1728) < 500)
-        self.assertTrue("count_1hour" in dmr.report(now))
+        self.assertTrue("count_1hour" in dmr.flush(1, now))
+        
+class TestPlugin(TestCase):
+    def test_factory(self):
+        self.assertTrue(distinct_plugin.distinct_metric_factory in \
+                        list(getPlugins(IMetricFactory)))
+        
+        
+        
