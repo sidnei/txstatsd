@@ -114,7 +114,8 @@ class ProcessReport(object):
         result = {prefix + ".cpu.percent": self.process.get_cpu_percent(),
                   prefix + ".cpu.user": utime,
                   prefix + ".cpu.system": stime,
-                  prefix + ".memory.percent": self.process.get_memory_percent(),
+                  prefix + ".memory.percent":
+                    self.process.get_memory_percent(),
                   prefix + ".memory.vsize": vsize,
                   prefix + ".memory.rss": rss}
         if getattr(self.process, "get_num_threads", None) is not None:

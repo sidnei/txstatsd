@@ -21,3 +21,6 @@ statsd-compliance: 1
 # configured monitor-response.
 monitor-message: txstatsd ping
 monitor-response: txstatsd pong
+
+[plugin_sample]
+sample-key: sample-value

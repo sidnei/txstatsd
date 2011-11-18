@@ -1,14 +1,16 @@
 import time
 
 from unittest import TestCase
+from twisted.plugin import getPlugins
 
 from txstatsd.server.processor import MessageProcessor
-
+from txstatsd.itxstatsd import IMetricFactory
 
 class TestMessageProcessor(MessageProcessor):
 
     def __init__(self):
-        super(TestMessageProcessor, self).__init__()
+        super(TestMessageProcessor, self).__init__(
+            plugins=getPlugins(IMetricFactory))
         self.failures = []
 
     def fail(self, message):
@@ -66,12 +68,12 @@ class ProcessMessagesTest(TestCase):
     def test_receive_distinct_metric(self):
         """
         A distinct metric message takes the form:
-        '<name>:<item>|d'.
-        'distinct' indicates this is a distinct metric message.
+        '<name>:<item>|pd'.
+        'pd' indicates this is a probabilistic distinct metric message.
         """
-        self.processor.process("gorets:one|d")
-        self.assertEqual(1, len(self.processor.distinct_metrics))
-        self.assertTrue(self.processor.distinct_metrics["gorets"].count() > 0)
+        self.processor.process("gorets:one|pd")
+        self.assertEqual(1, len(self.processor.plugin_metrics))
+        self.assertTrue(self.processor.plugin_metrics["gorets"].count() > 0)
 
     def test_receive_message_no_fields(self):
         """
@@ -120,7 +122,8 @@ class ProcessMessagesTest(TestCase):
 class FlushMessagesTest(TestCase):
 
     def setUp(self):
-        self.processor = MessageProcessor(time_function=lambda: 42)
+        self.processor = MessageProcessor(time_function=lambda: 42,
+                                          plugins=getPlugins(IMetricFactory))
 
     def test_flush_no_stats(self):
         """
@@ -243,15 +246,27 @@ class FlushMessagesTest(TestCase):
         a distinct metric.
         """
 
-        self.processor.process("gorets:item|d")
-        
+        self.processor.process("gorets:item|pd")
+
         messages = self.processor.flush()
         self.assertEqual(2, len(messages))
         metrics = messages[0]
-        self.assertTrue("stats.distinct.gorets.count " in metrics)
-        self.assertTrue("stats.distinct.gorets.count_1hour" in metrics)
-        self.assertTrue("stats.distinct.gorets.count_1min" in metrics)
-        self.assertTrue("stats.distinct.gorets.count_1day" in metrics)
+        self.assertTrue("stats.pdistinct.gorets.count " in metrics)
+        self.assertTrue("stats.pdistinct.gorets.count_1hour" in metrics)
+        self.assertTrue("stats.pdistinct.gorets.count_1min" in metrics)
+        self.assertTrue("stats.pdistinct.gorets.count_1day" in metrics)
+
+    def test_flush_plugin_arguments(self):
+        """Test the passing of arguments for flush."""
+
+        class FakeMetric(object):
+            def flush(self, interval, timestamp):
+                self.data = interval, timestamp
+
+        self.processor.plugin_metrics["somemetric"] = FakeMetric()
+        self.processor.flush(41000)
+        self.assertEquals((41,42),
+            self.processor.plugin_metrics["somemetric"].data)
 
 
 class FlushMeterMetricMessagesTest(TestCase):

@@ -5,6 +5,16 @@ from txstatsd.metrics.distinctmetric import DistinctMetric
 from txstatsd.metrics.metric import Metric
 
 
+class GenericMetric(Metric):
+    def __init__(self, connection, key, name, sample_rate=1):
+        super(GenericMetric, self).__init__(connection, name,
+                                            sample_rate=sample_rate)
+        self.key = key
+
+    def mark(self, value):
+        self.send("%s|%s" % (value, self.key))
+
+
 class Metrics(object):
     def __init__(self, connection=None, namespace=""):
         """A convenience class for reporting metric samples
@@ -19,6 +29,20 @@ class Metrics(object):
         self.connection = connection
         self.namespace = namespace
         self._metrics = {}
+
+    def report(self, name, value, metric_type, sample_rate=1):
+        """Report a generic metric.
+
+        Used for server side plugins without client support.
+        """
+        name = self.fully_qualify_name(name)
+        if not name in self._metrics:
+            metric = GenericMetric(self.connection,
+                                        metric_type,
+                                        name,
+                                        sample_rate)
+            self._metrics[name] = metric
+        self._metrics[name].mark(value)
 
     def gauge(self, name, value, sample_rate=1):
         """Report an instantaneous reading of a particular value."""
@@ -76,7 +100,7 @@ class Metrics(object):
             metric = DistinctMetric(self.connection, name)
             self._metrics[name] = metric
         self._metrics[name].mark(item)
-        
+
     def clear(self, name):
         """Allow the metric to re-initialize its internal state."""
         name = self.fully_qualify_name(name)

@@ -53,6 +53,12 @@ class TestMetrics(TestCase):
         self.assertEqual(self.connection.data,
                          'txstatsd.tests.timing:101123|ms')
 
+    def test_generic(self):
+        """Test the GenericMetric class."""
+        self.metrics.report('users', "pepe", "pd")
+        self.assertEqual(self.connection.data,
+                         'txstatsd.tests.users:pepe|pd')
+
     def test_empty_namespace(self):
         """Test reporting of an empty namespace."""
         self.metrics.namespace = None

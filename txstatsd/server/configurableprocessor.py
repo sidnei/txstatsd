@@ -24,9 +24,9 @@ class ConfigurableMessageProcessor(MessageProcessor):
 
     METRICS_SUMMARY = "statsd.numStats %s %s\n"
 
-    def __init__(self, time_function=time.time, message_prefix=""):
+    def __init__(self, time_function=time.time, message_prefix="", plugins=None):
         super(ConfigurableMessageProcessor, self).__init__(
-            time_function=time_function)
+            time_function=time_function, plugins=plugins)
 
         if message_prefix:
             self.metrics_summary = message_prefix + '.' + \
@@ -38,6 +38,9 @@ class ConfigurableMessageProcessor(MessageProcessor):
         self.message_prefix = message_prefix
         self.gauge_metrics = {}
 
+    def get_message_prefix(self, kind):
+        return self.message_prefix
+    
     def compose_timer_metric(self, key, duration):
         if not key in self.timer_metrics:
             metric = TimerMetricReporter(key, prefix=self.message_prefix)

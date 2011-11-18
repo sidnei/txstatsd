@@ -13,21 +13,23 @@ import time
 
 from string import Template
 
+from zope.interface import implements
 from txstatsd.metrics.metric import Metric
+from txstatsd.itxstatsd import IMetric
 
-   
+
 class SBoxHash(object):
     """A very fast hash.
-    
+
     This class create a random hash function that is very fast.
     Based on SBOXes. Not Crypto Strong.
-    
+
     Two instances of this class will hash differently.
     """
-    
+
     def __init__(self):
         self.table = [random.randint(0, 0xFFFFFFFF - 1) for i in range(256)]
-        
+
     def hash(self, data):
         value = 0
         for c in data:
@@ -35,14 +37,14 @@ class SBoxHash(object):
             value = value * 3
             value = value & 0xFFFFFFFF
         return value
-    
-        
+
+
 def hash(data):
     """Hash data using a random hasher."""
     p = SBoxHash()
     return p.hash(data)
-    
-    
+
+
 def zeros(n):
     """Count the zeros to the right of the binary representation of n."""
     count = 0
@@ -60,19 +62,19 @@ def zeros(n):
 
 class SlidingDistinctCounter(object):
     """A probabilistic distinct counter with sliding windows."""
-    
+
     def __init__(self, n_hashes, n_buckets):
         self.n_hashes = n_hashes
         self.n_buckets = n_buckets
-        
+
         self.hashes = [SBoxHash() for i in range(n_hashes)]
         self.buckets = [[0] * n_buckets for i in range(n_hashes)]
-        
+
     def add(self, when, item):
         hashes = (h.hash(item) for h in self.hashes)
         for i, value in enumerate(hashes):
             self.buckets[i][min(self.n_buckets - 1, zeros(value))] = when
-    
+
     def distinct(self, since=0):
         total = 0.0
         for i in range(self.n_hashes):
@@ -84,7 +86,7 @@ class SlidingDistinctCounter(object):
             total += least0
         v = total / self.n_hashes
         return int((2 ** v) / 0.77351)
-        
+
 
 class DistinctMetric(Metric):
     """
@@ -102,13 +104,13 @@ class DistinctMetricReporter(object):
     Keeps an estimate of the distinct numbers of items seen on various
     sliding windows of time.
     """
+    implements(IMetric)
 
     MESSAGE = (
         "$prefix%(key)s.count_1min %(count_1min)s %(timestamp)s\n"
         "$prefix%(key)s.count_1hour %(count_1hour)s %(timestamp)s\n"
         "$prefix%(key)s.count_1day %(count_1day)s %(timestamp)s\n"
-        "$prefix%(key)s.count %(count)s %(timestamp)s\n"
-    )
+        "$prefix%(key)s.count %(count)s %(timestamp)s\n")
 
     def __init__(self, name, wall_time_func=time.time, prefix=""):
         """Construct a metric we expect to be periodically updated.
@@ -131,18 +133,20 @@ class DistinctMetricReporter(object):
 
     def count_1min(self, now):
         return self.counter.distinct(now - 60)
-    
+
     def count_1hour(self, now):
         return self.counter.distinct(now - 60 * 60)
-    
+
     def count_1day(self, now):
         return self.counter.distinct(now - 60 * 60 * 24)
 
+    def process(self, fields):
+        self.update(fields[0])
+
     def update(self, item):
-        """Adds a seen item."""
         self.counter.add(self.wall_time_func(), item)
-    
-    def report(self, timestamp):
+
+    def flush(self, interval, timestamp):
         now = self.wall_time_func()
         return self.message % {
             "key": self.name,
