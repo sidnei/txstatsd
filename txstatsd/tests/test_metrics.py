@@ -52,9 +52,9 @@ class TestMetrics(TestCase):
         self.metrics.timing('timing', 101123)
         self.assertEqual(self.connection.data,
                          'txstatsd.tests.timing:101123|ms')
-        
+
     def test_generic(self):
-        """Test the timing operation."""
+        """Test the GenericMetric class."""
         self.metrics.report('users', "pepe", "pd")
         self.assertEqual(self.connection.data,
                          'txstatsd.tests.users:pepe|pd')

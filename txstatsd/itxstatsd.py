@@ -7,9 +7,9 @@ class IMetricFactory(Interface):
         @ivar name: The name of this kind of metric
         """)
 
-    metric_kind_key = Attribute("""
-        @type metric_kind_key: C{str}
-        @ivar metric_kind_key: The string that will be used by clients to send
+    metric_type = Attribute("""
+        @type metric_type: C{str}
+        @ivar metric_type: The string that will be used by clients to send
         metrics of this kind to the server.
         """)
 
@@ -40,7 +40,7 @@ class IMetric(Interface):
 
         @type fields: C{list}
         @param fields: The list of message parts. Usually in the form of
-        (value, metric_kind_key, [sample_rate])
+        (value, metric_type, [sample_rate])
         """
 
     def flush(interval, timestamp):

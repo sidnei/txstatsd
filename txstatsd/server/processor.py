@@ -62,13 +62,13 @@ class MessageProcessor(object):
         self.gauge_metrics = deque()
         self.meter_metrics = {}
         self.distinct_metrics = {}
-        
+
         self.plugins = {}
         self.plugin_metrics = {}
-        
+
         if plugins is not None:
             for plugin in plugins:
-                self.plugins[plugin.metric_kind_key] = plugin
+                self.plugins[plugin.metric_type] = plugin
 
     def fail(self, message):
         """Log and discard malformed message."""
@@ -92,7 +92,7 @@ class MessageProcessor(object):
 
         key = normalize_key(key)
         metric_type = fields[1]
-        
+
         if metric_type == "c":
             self.process_counter_metric(key, fields, message)
         elif metric_type == "ms":
@@ -102,13 +102,13 @@ class MessageProcessor(object):
         elif metric_type == "m":
             self.process_meter_metric(key, fields[0], message)
         elif metric_type in self.plugins:
-            self.process_plugin_metric(metric_type, key, fields, message)            
+            self.process_plugin_metric(metric_type, key, fields, message)
         else:
             return self.fail(message)
 
     def get_message_prefix(self, kind):
         return "stats." + kind
-    
+
     def process_plugin_metric(self, metric_type, key, items, message):
         if not key in self.plugin_metrics:
             factory = self.plugins[metric_type]
@@ -117,7 +117,7 @@ class MessageProcessor(object):
                 name=key, wall_time_func=self.time_function)
             self.plugin_metrics[key] = metric
         self.plugin_metrics[key].process(items)
-    
+
     def process_timer_metric(self, key, duration, message):
         try:
             duration = float(duration)
@@ -220,7 +220,7 @@ class MessageProcessor(object):
         if events > 0:
             messages.extend(plugin_metrics)
             num_stats += events
-            
+
         self.flush_metrics_summary(messages, num_stats, timestamp)
         return messages
 
@@ -317,7 +317,7 @@ class MessageProcessor(object):
             events += 1
 
         return (metrics, events)
-        
+
     def flush_metrics_summary(self, messages, num_stats, timestamp):
         messages.append("statsd.numStats %s %s\n" % (num_stats, timestamp))
 
