@@ -247,7 +247,7 @@ class FlushMessagesTest(TestCase):
         """
 
         self.processor.process("gorets:item|pd")
-        
+
         messages = self.processor.flush()
         self.assertEqual(2, len(messages))
         metrics = messages[0]
@@ -255,6 +255,18 @@ class FlushMessagesTest(TestCase):
         self.assertTrue("stats.pdistinct.gorets.count_1hour" in metrics)
         self.assertTrue("stats.pdistinct.gorets.count_1min" in metrics)
         self.assertTrue("stats.pdistinct.gorets.count_1day" in metrics)
+
+    def test_flush_plugin_arguments(self):
+        """Test the passing of arguments for flush."""
+
+        class FakeMetric(object):
+            def flush(self, interval, timestamp):
+                self.data = interval, timestamp
+
+        self.processor.plugin_metrics["somemetric"] = FakeMetric()
+        self.processor.flush(41000)
+        self.assertEquals((41,42),
+            self.processor.plugin_metrics["somemetric"].data)
 
 
 class FlushMeterMetricMessagesTest(TestCase):

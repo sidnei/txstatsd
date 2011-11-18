@@ -84,6 +84,7 @@ class TestDistinctMetricReporter(TestCase):
 
 
 class TestPlugin(TestCase):
+    
     def test_factory(self):
         self.assertTrue(distinct_plugin.distinct_metric_factory in \
                         list(getPlugins(IMetricFactory)))
