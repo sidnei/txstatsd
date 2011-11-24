@@ -9,6 +9,9 @@ from twisted.application.service import MultiService
 from twisted.python import usage
 from twisted.plugin import getPlugins
 
+from carbon.routers import RelayRulesRouter, ConsistentHashingRouter
+from carbon.client import CarbonClientManager
+
 from txstatsd.client import InternalClient
 from txstatsd.metrics.metrics import Metrics
 from txstatsd.server.processor import MessageProcessor
@@ -17,6 +20,8 @@ from txstatsd.server.protocol import (
     GraphiteClientFactory, StatsDServerProtocol)
 from txstatsd.report import ReportingService
 from txstatsd.itxstatsd import IMetricFactory
+from twisted.application.service import Service
+from twisted.internet import task
 
 
 def accumulateClassList(classObj, attr, listObj,
@@ -134,6 +139,34 @@ class StatsDOptions(OptionsGlue):
         super(StatsDOptions, self).__init__()
 
 
+class StatsDService(Service):
+
+    def __init__(self, carbon_client, processor, flush_interval, clock=None):
+        self.carbon_client = carbon_client
+        self.processor = processor
+        self.flush_interval = flush_interval
+        self.flush_task = task.LoopingCall(self.flushProcessor)
+        if clock is not None:
+            self.flush_task.clock = clock
+
+    def flushProcessor(self):
+        """Flush messages queued in the processor to Graphite."""
+        for message in self.processor.flush(interval=self.flush_interval):
+            # XXX This is nasty. We should instead change 'flush' to not build up
+            # strings so that we can use the pickle-based protocol with less
+            # overhead.
+            for line in filter(None, message.splitlines()):
+                metric, value, timestamp = line.split()
+                self.carbon_client.sendDatapoint(metric, (timestamp, value))
+
+    def startService(self):
+        self.flush_task.start(self.flush_interval / 1000, False)
+
+    def stopService(self):
+        if self.flush_task.running:
+            self.flush_task.stop()
+
+
 def createService(options):
     """Create a txStatsD service."""
 
@@ -180,12 +213,18 @@ def createService(options):
     metrics_updater.setServiceParent(service)
     metrics_updater.schedule(processor.update_metrics, 5, None)
 
-    factory = GraphiteClientFactory(processor, options["flush-interval"],
-                                    prefix=prefix)
-    client = TCPClient(options["carbon-cache-host"],
-                       options["carbon-cache-port"],
-                       factory)
-    client.setServiceParent(service)
+    # XXX Make this configurable.
+    router = ConsistentHashingRouter()
+    carbon_client = CarbonClientManager(router)
+    carbon_client.setServiceParent(service)
+
+    carbon_client.startClient((options["carbon-cache-host"],
+                               options["carbon-cache-port"],
+                               None))
+
+    statsd_service = StatsDService(carbon_client, processor,
+                                   options["flush-interval"])
+    statsd_service.setServiceParent(service)
 
     statsd_server_protocol = StatsDServerProtocol(
         processor,
