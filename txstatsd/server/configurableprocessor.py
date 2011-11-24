@@ -2,6 +2,7 @@
 import time
 
 from txstatsd.metrics.countermetric import CounterMetricReporter
+from txstatsd.metrics.distinctmetric import DistinctMetricReporter
 from txstatsd.metrics.gaugemetric import GaugeMetricReporter
 from txstatsd.metrics.metermetric import MeterMetricReporter
 from txstatsd.metrics.timermetric import TimerMetricReporter

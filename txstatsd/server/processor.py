@@ -6,7 +6,6 @@ import logging
 from twisted.python import log
 
 from txstatsd.metrics.metermetric import MeterMetricReporter
-from txstatsd.metrics.distinctmetric import DistinctMetricReporter
 
 
 SPACES = re.compile("\s+")
