@@ -1,4 +1,5 @@
 
+import time
 from txstatsd.metrics.gaugemetric import GaugeMetric
 from txstatsd.metrics.metermetric import MeterMetric
 from txstatsd.metrics.distinctmetric import DistinctMetric
@@ -29,6 +30,7 @@ class Metrics(object):
         self.connection = connection
         self.namespace = namespace
         self._metrics = {}
+        self.last_time = 0
 
     def report(self, name, value, metric_type, sample_rate=1):
         """Report a generic metric.
@@ -84,15 +86,25 @@ class Metrics(object):
             self._metrics[name] = metric
         self._metrics[name].send("%s|c" % -value)
 
-    def timing(self, name, duration, sample_rate=1):
-        """Report this sample performed in duration ms."""
+    def reset_timing(self):
+        """Resets the duration timer for the next call to timing()"""
+        self.last_time = time.time()
+
+    def timing(self, name, duration = None, sample_rate=1):
+        """Report that this sample performed in duration seconds.
+           Default duration is the actual elapsed time since
+           the last call to this method or reset_timing()"""
+        if duration is None:
+            current_time = time.time()
+            duration = current_time - self.last_time
+            self.last_time = current_time
         name = self.fully_qualify_name(name)
         if not name in self._metrics:
             metric = Metric(self.connection,
                             name,
                             sample_rate)
             self._metrics[name] = metric
-        self._metrics[name].send("%s|ms" % duration)
+        self._metrics[name].send("%s|ms" % (duration * 1000))
 
     def distinct(self, name, item):
         name = self.fully_qualify_name(name)
