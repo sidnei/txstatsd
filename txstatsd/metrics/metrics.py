@@ -97,7 +97,7 @@ class Metrics(object):
         self.last_time = current_time
         return duration
 
-    def timing(self, name, duration = None, sample_rate=1):
+    def timing(self, name, duration=None, sample_rate=1):
         """Report that this sample performed in duration seconds.
            Default duration is the actual elapsed time since
            the last call to this method or reset_timing()"""

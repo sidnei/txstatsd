@@ -14,5 +14,5 @@ class IMetrics(Interface):
     def decrement(name, value=1, sample_rate=1):
         """Decrement counter C{name} by C{count}."""
 
-    def timing(name, duration = None, sample_rate=1):
+    def timing(name, duration=None, sample_rate=1):
         """Report that C{name} took C{duration} seconds."""
