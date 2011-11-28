@@ -4,20 +4,16 @@ import socket
 import sys
 import ConfigParser
 
-from twisted.application.internet import TCPClient, UDPServer
+from twisted.application.internet import UDPServer
 from twisted.application.service import MultiService
 from twisted.python import usage
 from twisted.plugin import getPlugins
-
-from carbon.routers import RelayRulesRouter, ConsistentHashingRouter
-from carbon.client import CarbonClientManager
 
 from txstatsd.client import InternalClient
 from txstatsd.metrics.metrics import Metrics
 from txstatsd.server.processor import MessageProcessor
 from txstatsd.server.configurableprocessor import ConfigurableMessageProcessor
-from txstatsd.server.protocol import (
-    GraphiteClientFactory, StatsDServerProtocol)
+from txstatsd.server.protocol import StatsDServerProtocol
 from txstatsd.report import ReportingService
 from txstatsd.itxstatsd import IMetricFactory
 from twisted.application.service import Service
@@ -114,11 +110,14 @@ class StatsDOptions(OptionsGlue):
     """
     The set of configuration settings for txStatsD.
     """
+
     optParameters = [
-        ["carbon-cache-host", "h", "localhost",
+        ["carbon-cache-host", "h", None,
          "The host where carbon cache is listening."],
-        ["carbon-cache-port", "p", 2003,
+        ["carbon-cache-port", "p", None,
          "The port where carbon cache is listening.", int],
+        ["carbon-cache-name", "n", None,
+         "An identifier for the carbon-cache instance."],
         ["listen-port", "l", 8125,
          "The UDP port where we will listen.", int],
         ["flush-interval", "i", 60000,
@@ -132,11 +131,28 @@ class StatsDOptions(OptionsGlue):
         ["monitor-response", "o", "txstatsd pong",
          "Response we should send monitoring agent.", str],
         ["statsd-compliance", "s", 1,
-         "Produce StatsD-compliant messages.", int]]
+         "Produce StatsD-compliant messages.", int],
+        ["max-queue-size", "Q", 1000,
+         "Maximum send queue size per destination.", int],
+        ["max-datapoints-per-message", "M", 500,
+         "Maximum datapoints per message to carbon-cache.", int],
+        ]
 
     def __init__(self):
         self.config_section = 'statsd'
         super(StatsDOptions, self).__init__()
+        self["carbon-cache-host"] = []
+        self["carbon-cache-port"] = []
+        self["carbon-cache-name"] = []
+
+    def opt_carbon_cache_host(self, host):
+        self["carbon-cache-host"].append(host)
+
+    def opt_carbon_cache_port(self, port):
+        self["carbon-cache-port"].append(usage.portCoerce(port))
+
+    def opt_carbon_cache_name(self, name):
+        self["carbon-cache-name"].append(name)
 
 
 class StatsDService(Service):
@@ -167,11 +183,28 @@ class StatsDService(Service):
             self.flush_task.stop()
 
 
+def report_client_manager_stats():
+    from carbon.instrumentation import stats
+
+    current_stats = stats.copy()
+    stats.clear()
+    for name in list(current_stats.keys()):
+        if not name.startswith("destinations"):
+            del stats[name]
+    return current_stats
+
+
 def createService(options):
     """Create a txStatsD service."""
+    from carbon.routers import ConsistentHashingRouter
+    from carbon.client import CarbonClientManager
+    from carbon.conf import settings
 
-    service = MultiService()
-    service.setName("statsd")
+    settings.MAX_QUEUE_SIZE = options["max-queue-size"]
+    settings.MAX_DATAPOINTS_PER_MESSAGE = options["max-datapoints-per-message"]
+
+    root_service = MultiService()
+    root_service.setName("statsd")
 
     prefix = options["prefix"]
     if prefix is None:
@@ -193,12 +226,25 @@ def createService(options):
         connection = InternalClient(processor)
         metrics = Metrics(connection)
 
+    if not options["carbon-cache-host"]:
+        options["carbon-cache-host"].append("127.0.0.1")
+    if not options["carbon-cache-port"]:
+        options["carbon-cache-port"].append(2004)
+    if not options["carbon-cache-name"]:
+        options["carbon-cache-name"].append(None)
+
+    reporting = ReportingService()
+    reporting.setServiceParent(root_service)
+
+    # Schedule updates for those metrics expecting to be
+    # periodically updated, for example the meter metric.
+    reporting.schedule(processor.update_metrics, 5, None)
+    reporting.schedule(report_client_manager_stats, 10, None)
+
     if options["report"] is not None:
         from txstatsd import process
         from twisted.internet import reactor
 
-        reporting = ReportingService()
-        reporting.setServiceParent(service)
         reporting.schedule(
             process.report_reactor_stats(reactor), 10, metrics.gauge)
         reports = [name.strip() for name in options["report"].split(",")]
@@ -207,30 +253,25 @@ def createService(options):
                                     report_name.upper(), ()):
                 reporting.schedule(reporter, 10, metrics.gauge)
 
-    # Schedule updates for those metrics expecting to be
-    # periodically updated, for example the meter metric.
-    metrics_updater = ReportingService()
-    metrics_updater.setServiceParent(service)
-    metrics_updater.schedule(processor.update_metrics, 5, None)
-
     # XXX Make this configurable.
     router = ConsistentHashingRouter()
     carbon_client = CarbonClientManager(router)
-    carbon_client.setServiceParent(service)
+    carbon_client.setServiceParent(root_service)
 
-    carbon_client.startClient((options["carbon-cache-host"],
-                               options["carbon-cache-port"],
-                               None))
+    for host, port, name in zip(options["carbon-cache-host"],
+                                options["carbon-cache-port"],
+                                options["carbon-cache-name"]):
+        carbon_client.startClient((host, port, name))
 
     statsd_service = StatsDService(carbon_client, processor,
                                    options["flush-interval"])
-    statsd_service.setServiceParent(service)
+    statsd_service.setServiceParent(root_service)
 
     statsd_server_protocol = StatsDServerProtocol(
         processor,
         monitor_message=options["monitor-message"],
         monitor_response=options["monitor-response"])
     listener = UDPServer(options["listen-port"], statsd_server_protocol)
-    listener.setServiceParent(service)
+    listener.setServiceParent(root_service)
 
-    return service
+    return root_service
