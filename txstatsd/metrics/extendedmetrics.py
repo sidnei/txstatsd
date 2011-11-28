@@ -39,8 +39,10 @@ class ExtendedMetrics(Metrics):
             self._metrics[name] = metric
         self._metrics[name].decrement(value)
 
-    def timing(self, name, duration, sample_rate=1):
-        """Report this sample performed in duration ms."""
+    def timing(self, name, duration=None, sample_rate=1):
+        """Report this sample performed in duration seconds."""
+        if duration is None:
+            duration = self.calculate_duration()
         name = self.fully_qualify_name(name)
         if not name in self._metrics:
             metric = TimerMetric(self.connection,

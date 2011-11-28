@@ -3,6 +3,7 @@
 import re
 import time
 from unittest import TestCase
+from txstatsd.metrics.extendedmetrics import ExtendedMetrics
 from txstatsd.metrics.metrics import Metrics
 
 
@@ -101,4 +102,19 @@ class TestMetrics(TestCase):
         self.metrics.gauge('gauge', 413)
         self.assertEqual(self.connection.data,
                          'gauge:413|g')
+
+
+class TestExtendedMetrics(TestMetrics):
+    def setUp(self):
+        super(TestExtendedMetrics, self).setUp()
+        self.metrics = ExtendedMetrics(self.connection, 'txstatsd.tests')
+
+    def test_counter(self):
+        """Test the increment and decrement operations."""
+        self.metrics.increment('counter', 18)
+        self.assertEqual(self.connection.data,
+                         'txstatsd.tests.counter:18|c')
+        self.metrics.decrement('counter', 9)
+        self.assertEqual(self.connection.data,
+                         'txstatsd.tests.counter:9|c')
 
