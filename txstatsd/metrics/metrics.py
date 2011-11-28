@@ -90,14 +90,19 @@ class Metrics(object):
         """Resets the duration timer for the next call to timing()"""
         self.last_time = time.time()
 
+    def calculate_duration(self):
+        """Resets the duration timer and returns the elapsed duration"""
+        current_time = time.time()
+        duration = current_time - self.last_time
+        self.last_time = current_time
+        return duration
+
     def timing(self, name, duration = None, sample_rate=1):
         """Report that this sample performed in duration seconds.
            Default duration is the actual elapsed time since
            the last call to this method or reset_timing()"""
         if duration is None:
-            current_time = time.time()
-            duration = current_time - self.last_time
-            self.last_time = current_time
+            duration = self.calculate_duration()
         name = self.fully_qualify_name(name)
         if not name in self._metrics:
             metric = Metric(self.connection,
