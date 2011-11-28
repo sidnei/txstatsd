@@ -30,7 +30,7 @@ class TimerMetric(Metric):
 
     def mark(self, duration):
         """Report this sample performed in duration (measured in seconds)."""
-        self.send("%s|ms" % duration)
+        self.send("%s|ms" % (duration * 1000))
 
 
 class TimerMetricReporter(object):
