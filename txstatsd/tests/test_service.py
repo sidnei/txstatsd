@@ -155,6 +155,26 @@ class StatsDOptionsTestCase(TestCase):
                           ["a", "b", "c"])
 
 
+class ClientManagerStatsTestCase(TestCase):
+
+    def test_report_client_manager_stats(self):
+        """
+        Calling C{report_client_manager_stats} pokes into carbon's
+        instrumentation stats global dict and pulls out only metrics that start
+        with C{destinations}.
+        """
+        from carbon.instrumentation import stats
+
+        stats["foo"] = 0
+        stats["bar"] = 1
+        stats["destinations.bahamas"] = 2
+        stats["destinations.hawaii"] = 3
+        self.assertEquals({"destinations.bahamas": 2,
+                           "destinations.hawaii": 3},
+                          service.report_client_manager_stats())
+        self.assertEquals({}, stats)
+
+
 class Agent(DatagramProtocol):
 
     def __init__(self):
