@@ -190,7 +190,7 @@ def report_client_manager_stats():
     stats.clear()
     for name in list(current_stats.keys()):
         if not name.startswith("destinations"):
-            del stats[name]
+            del current_stats[name]
     return current_stats
 
 
@@ -239,7 +239,7 @@ def createService(options):
     # Schedule updates for those metrics expecting to be
     # periodically updated, for example the meter metric.
     reporting.schedule(processor.update_metrics, 5, None)
-    reporting.schedule(report_client_manager_stats, 10, None)
+    reporting.schedule(report_client_manager_stats, 10, metrics.gauge)
 
     if options["report"] is not None:
         from txstatsd import process
