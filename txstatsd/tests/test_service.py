@@ -199,6 +199,16 @@ class ServiceTestsBuilder(ReactorBuilder):
         self.assertTrue(isinstance(statsd, service.StatsDService))
         self.assertTrue(isinstance(udp, UDPServer))
 
+    def test_default_clients(self):
+        """
+        Test that default clients are created when none is specified.
+        """
+        o = service.StatsDOptions()
+        s = service.createService(o)
+        manager = s.services[1]
+        self.assertEqual(sorted(manager.client_factories.keys()),
+                         [("127.0.0.1", 2004, None)])
+
     def test_multiple_clients(self):
         """
         Test that multiple clients are created when the config specifies so.
