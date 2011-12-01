@@ -193,6 +193,19 @@ class ServiceTestsBuilder(ReactorBuilder):
                          [("127.0.0.1", 2004, "a"),
                           ("127.0.0.2", 2005, "b")])
 
+    def test_carbon_client_options(self):
+        """
+        Options for carbon-client get set into carbon's settings object.
+        """
+        from carbon.conf import settings
+
+        o = service.StatsDOptions()
+        o["max-queue-size"] = 10001
+        o["max-datapoints-per-message"] = 10002
+        service.createService(o)
+        self.assertEqual(settings.MAX_QUEUE_SIZE, 10001)
+        self.assertEqual(settings.MAX_DATAPOINTS_PER_MESSAGE, 10002)
+
     def test_monitor_response(self):
         """
         The StatsD service messages the expected response to the
