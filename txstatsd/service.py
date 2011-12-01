@@ -92,18 +92,29 @@ class OptionsGlue(usage.Options):
     def configure(self, config_file):
         """Read the configuration items, coercing types as required."""
         for name, value in config_file.items(self.config_section):
-            # Overridden options have precedence
-            if not self.overridden_option(name):
-                # Options appends '=' when gathering the parameters
-                if (name + '=') in self.longOpt:
-                    # Coerce the type if required
-                    if name in self._dispatch:
-                        value = self._dispatch[name].coerce(value)
-                    self[name] = value
+            self._coerce_option(name, value)
 
         for section in config_file.sections():
             if section.startswith("plugin_"):
                 self[section] = config_file.items(section)
+            if section.startswith("carbon-cache"):
+                for name, value in config_file.items(section):
+                    self._coerce_option(name, value)
+
+    def _coerce_option(self, name, value):
+        """Coerce a single option, checking for overriden options."""
+        # Overridden options have precedence
+        if not self.overridden_option(name):
+            # Options appends '=' when gathering the parameters
+            if (name + '=') in self.longOpt:
+                # Coerce the type if required
+                if name in self._dispatch:
+                    if isinstance(self._dispatch[name], usage.CoerceParameter):
+                        value = self._dispatch[name].coerce(value)
+                    else:
+                        self._dispatch[name](name, value)
+                        return
+                self[name] = value
 
 
 class StatsDOptions(OptionsGlue):
@@ -113,7 +124,7 @@ class StatsDOptions(OptionsGlue):
 
     optParameters = [
         ["carbon-cache-host", "h", None,
-         "The host where carbon cache is listening."],
+         "The host where carbon cache is listening.", str],
         ["carbon-cache-port", "p", None,
          "The port where carbon cache is listening.", int],
         ["carbon-cache-name", "n", None,
