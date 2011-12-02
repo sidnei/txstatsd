@@ -5,6 +5,7 @@ from txstatsd.metrics.metrics import Metrics
 
 
 class ExtendedMetrics(Metrics):
+
     def __init__(self, connection=None, namespace=""):
         """A convenience class for reporting metric samples
         to a C{txstatsd} server configured with the

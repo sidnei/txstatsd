@@ -12,6 +12,7 @@ from txstatsd.itxstatsd import IMetricFactory
 
 
 class TestHash(TestCase):
+
     def test_hash_chars(self):
         "For one table, all chars map to different chars"
         results = set()
@@ -43,6 +44,7 @@ class TestHash(TestCase):
 
 
 class TestZeros(TestCase):
+
     def test_zeros(self):
         self.assertEquals(distinct.zeros(1), 0)
         self.assertEquals(distinct.zeros(2), 1)
@@ -53,6 +55,7 @@ class TestZeros(TestCase):
 
 
 class TestDistinct(TestCase):
+
     def test_all(self):
         random.seed(1)
 
@@ -65,6 +68,7 @@ class TestDistinct(TestCase):
 
 
 class TestDistinctMetricReporter(TestCase):
+
     def test_reports(self):
         random.seed(1)
         _wall_time = [0]
@@ -80,7 +84,6 @@ class TestDistinctMetricReporter(TestCase):
         self.assertTrue(abs(dmr.count_1min(now) - 1) < 2)
         self.assertTrue(abs(dmr.count_1hour(now) - 72) < 15)
         self.assertTrue(abs(dmr.count_1day(now) - 1728) < 500)
-        self.assertTrue("count_1hour" in dmr.flush(1, now))
 
 
 class TestPlugin(TestCase):

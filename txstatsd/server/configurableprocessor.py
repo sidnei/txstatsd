@@ -23,18 +23,18 @@ class ConfigurableMessageProcessor(MessageProcessor):
       duration statistics, plus throughput statistics.
     """
 
-    METRICS_SUMMARY = "statsd.numStats %s %s\n"
+    METRICS_SUMMARY = "statsd.numStats"
 
     def __init__(self, time_function=time.time, message_prefix="", plugins=None):
         super(ConfigurableMessageProcessor, self).__init__(
             time_function=time_function, plugins=plugins)
 
         if message_prefix:
-            self.metrics_summary = message_prefix + '.' + \
-                ConfigurableMessageProcessor.METRICS_SUMMARY
+            self.metrics_summary = (
+                message_prefix + "." + 
+                ConfigurableMessageProcessor.METRICS_SUMMARY)
         else:
-            self.metrics_summary = \
-                ConfigurableMessageProcessor.METRICS_SUMMARY
+            self.metrics_summary = ConfigurableMessageProcessor.METRICS_SUMMARY
 
         self.message_prefix = message_prefix
         self.gauge_metrics = {}
@@ -86,8 +86,8 @@ class ConfigurableMessageProcessor(MessageProcessor):
         metrics = []
         events = 0
         for metric in self.counter_metrics.itervalues():
-            message = metric.report(timestamp)
-            metrics.append(message)
+            messages = metric.report(timestamp)
+            metrics.extend(messages)
             events += 1
 
         return (metrics, events)
@@ -96,8 +96,8 @@ class ConfigurableMessageProcessor(MessageProcessor):
         metrics = []
         events = 0
         for metric in self.gauge_metrics.itervalues():
-            message = metric.report(timestamp)
-            metrics.append(message)
+            messages = metric.report(timestamp)
+            metrics.extend(messages)
             events += 1
 
         return (metrics, events)
@@ -106,14 +106,14 @@ class ConfigurableMessageProcessor(MessageProcessor):
         metrics = []
         events = 0
         for metric in self.timer_metrics.itervalues():
-            message = metric.report(timestamp)
-            metrics.append(message)
+            messages = metric.report(timestamp)
+            metrics.extend(messages)
             events += 1
 
         return (metrics, events)
 
     def flush_metrics_summary(self, messages, num_stats, timestamp):
-        messages.append(self.metrics_summary % (num_stats, timestamp))
+        messages.append((self.metrics_summary, num_stats, timestamp))
 
     def update_metrics(self):
         super(ConfigurableMessageProcessor, self).update_metrics()

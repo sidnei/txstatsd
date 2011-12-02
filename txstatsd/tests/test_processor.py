@@ -130,7 +130,7 @@ class FlushMessagesTest(TestCase):
         Flushing the message processor when there are no stats available should
         still produce one message where C{statsd.numStats} is set to zero.
         """
-        self.assertEqual(["statsd.numStats 0 42\n"], self.processor.flush())
+        self.assertEqual([("statsd.numStats", 0, 42)], self.processor.flush())
 
     def test_flush_counter(self):
         """
@@ -139,11 +139,10 @@ class FlushMessagesTest(TestCase):
         """
         self.processor.counter_metrics["gorets"] = 42
         messages = self.processor.flush()
-        self.assertEqual(2, len(messages))
-        counters = messages[0].splitlines()
-        self.assertEqual("stats.gorets 4 42", counters[0])
-        self.assertEqual("stats_counts.gorets 42 42", counters[1])
-        self.assertEqual("statsd.numStats 1 42", messages[1].splitlines()[0])
+        self.assertEqual(3, len(messages))
+        self.assertEqual(("stats.gorets", 4, 42), messages[0])
+        self.assertEqual(("stats_counts.gorets", 42, 42), messages[1])
+        self.assertEqual(("statsd.numStats", 1, 42), messages[2])
         self.assertEqual(0, self.processor.counter_metrics["gorets"])
 
     def test_flush_counter_one_second_interval(self):
@@ -153,11 +152,10 @@ class FlushMessagesTest(TestCase):
         """
         self.processor.counter_metrics["gorets"] = 42
         messages = self.processor.flush(interval=1000)
-        self.assertEqual(2, len(messages))
-        counters = messages[0].splitlines()
-        self.assertEqual("stats.gorets 42 42", counters[0])
-        self.assertEqual("stats_counts.gorets 42 42", counters[1])
-        self.assertEqual("statsd.numStats 1 42", messages[1].splitlines()[0])
+        self.assertEqual(3, len(messages))
+        self.assertEqual(("stats.gorets", 42, 42), messages[0])
+        self.assertEqual(("stats_counts.gorets", 42, 42), messages[1])
+        self.assertEqual(("statsd.numStats", 1, 42), messages[2])
         self.assertEqual(0, self.processor.counter_metrics["gorets"])
 
     def test_flush_single_timer_single_time(self):
@@ -168,14 +166,13 @@ class FlushMessagesTest(TestCase):
         """
         self.processor.timer_metrics["glork"] = [24]
         messages = self.processor.flush()
-        self.assertEqual(2, len(messages))
-        timers = messages[0].splitlines()
-        self.assertEqual("stats.timers.glork.mean 24 42", timers[0])
-        self.assertEqual("stats.timers.glork.upper 24 42", timers[1])
-        self.assertEqual("stats.timers.glork.upper_90 24 42", timers[2])
-        self.assertEqual("stats.timers.glork.lower 24 42", timers[3])
-        self.assertEqual("stats.timers.glork.count 1 42", timers[4])
-        self.assertEqual("statsd.numStats 1 42", messages[1].splitlines()[0])
+        self.assertEqual(6, len(messages))
+        self.assertEqual(("stats.timers.glork.count", 1, 42), messages[0])
+        self.assertEqual(("stats.timers.glork.lower", 24, 42), messages[1])
+        self.assertEqual(("stats.timers.glork.mean", 24, 42), messages[2])
+        self.assertEqual(("stats.timers.glork.upper", 24, 42), messages[3])
+        self.assertEqual(("stats.timers.glork.upper_90", 24, 42), messages[4])
+        self.assertEqual(("statsd.numStats", 1, 42), messages[5])
         self.assertEqual([], self.processor.timer_metrics["glork"])
 
     def test_flush_single_timer_multiple_times(self):
@@ -189,14 +186,13 @@ class FlushMessagesTest(TestCase):
         """
         self.processor.timer_metrics["glork"] = [4, 8, 15, 16, 23, 42]
         messages = self.processor.flush()
-        self.assertEqual(2, len(messages))
-        timers = messages[0].splitlines()
-        self.assertEqual("stats.timers.glork.mean 13 42", timers[0])
-        self.assertEqual("stats.timers.glork.upper 42 42", timers[1])
-        self.assertEqual("stats.timers.glork.upper_90 23 42", timers[2])
-        self.assertEqual("stats.timers.glork.lower 4 42", timers[3])
-        self.assertEqual("stats.timers.glork.count 6 42", timers[4])
-        self.assertEqual("statsd.numStats 1 42", messages[1].splitlines()[0])
+        self.assertEqual(6, len(messages))
+        self.assertEqual(("stats.timers.glork.count", 6, 42), messages[0])
+        self.assertEqual(("stats.timers.glork.lower", 4, 42), messages[1])
+        self.assertEqual(("stats.timers.glork.mean", 13, 42), messages[2])
+        self.assertEqual(("stats.timers.glork.upper", 42, 42), messages[3])
+        self.assertEqual(("stats.timers.glork.upper_90", 23, 42), messages[4])
+        self.assertEqual(("statsd.numStats", 1, 42), messages[5])
         self.assertEqual([], self.processor.timer_metrics["glork"])
 
     def test_flush_single_timer_50th_percentile(self):
@@ -213,14 +209,13 @@ class FlushMessagesTest(TestCase):
         """
         self.processor.timer_metrics["glork"] = [4, 8, 15, 16, 23, 42]
         messages = self.processor.flush(percent=50)
-        self.assertEqual(2, len(messages))
-        timers = messages[0].splitlines()
-        self.assertEqual("stats.timers.glork.mean 9 42", timers[0])
-        self.assertEqual("stats.timers.glork.upper 42 42", timers[1])
-        self.assertEqual("stats.timers.glork.upper_50 15 42", timers[2])
-        self.assertEqual("stats.timers.glork.lower 4 42", timers[3])
-        self.assertEqual("stats.timers.glork.count 6 42", timers[4])
-        self.assertEqual("statsd.numStats 1 42", messages[1].splitlines()[0])
+        self.assertEqual(6, len(messages))
+        self.assertEqual(("stats.timers.glork.count", 6, 42), messages[0])
+        self.assertEqual(("stats.timers.glork.lower", 4, 42), messages[1])
+        self.assertEqual(("stats.timers.glork.mean", 9, 42), messages[2])
+        self.assertEqual(("stats.timers.glork.upper", 42, 42), messages[3])
+        self.assertEqual(("stats.timers.glork.upper_50", 15, 42), messages[4])
+        self.assertEqual(("statsd.numStats", 1, 42), messages[5])
         self.assertEqual([], self.processor.timer_metrics["glork"])
 
     def test_flush_gauge_metric(self):
@@ -233,11 +228,10 @@ class FlushMessagesTest(TestCase):
 
         messages = self.processor.flush()
         self.assertEqual(2, len(messages))
-        gauge_metric = messages[0].splitlines()
         self.assertEqual(
-            "stats.gauge.gorets.value 9.6 42", gauge_metric[0])
+            ("stats.gauge.gorets.value", 9.6, 42), messages[0])
         self.assertEqual(
-            "statsd.numStats 1 42", messages[1].splitlines()[0])
+            ("statsd.numStats", 1, 42), messages[1])
         self.assertEqual(0, len(self.processor.gauge_metrics))
 
     def test_flush_distinct_metric(self):
@@ -249,12 +243,11 @@ class FlushMessagesTest(TestCase):
         self.processor.process("gorets:item|pd")
 
         messages = self.processor.flush()
-        self.assertEqual(2, len(messages))
-        metrics = messages[0]
-        self.assertTrue("stats.pdistinct.gorets.count " in metrics)
-        self.assertTrue("stats.pdistinct.gorets.count_1hour" in metrics)
-        self.assertTrue("stats.pdistinct.gorets.count_1min" in metrics)
-        self.assertTrue("stats.pdistinct.gorets.count_1day" in metrics)
+        self.assertEqual(5, len(messages))
+        self.assertEqual(("stats.pdistinct.gorets.count", 1, 42), messages[0])
+        self.assertEqual(("stats.pdistinct.gorets.count_1day", 5552568545, 42), messages[1])
+        self.assertEqual(("stats.pdistinct.gorets.count_1hour", 5552568545, 42), messages[2])
+        self.assertEqual(("stats.pdistinct.gorets.count_1min", 5552568545, 42), messages[3])
 
     def test_flush_plugin_arguments(self):
         """Test the passing of arguments for flush."""
@@ -262,6 +255,7 @@ class FlushMessagesTest(TestCase):
         class FakeMetric(object):
             def flush(self, interval, timestamp):
                 self.data = interval, timestamp
+                return []
 
         self.processor.plugin_metrics["somemetric"] = FakeMetric()
         self.processor.flush(41000)
@@ -291,26 +285,25 @@ class FlushMeterMetricMessagesTest(TestCase):
 
         self.time_now += 1
         messages = self.processor.flush()
-        self.assertEqual(2, len(messages))
-        meter_metric = messages[0].splitlines()
+        self.assertEqual(6, len(messages))
         self.assertEqual(
-            "stats.meter.gorets.count 3.0 %s" % self.time_now,
-            meter_metric[0])
+            ("stats.meter.gorets.15min_rate", 0.0, self.time_now),
+            messages[0])
         self.assertEqual(
-            "stats.meter.gorets.mean_rate 3.0 %s" % self.time_now,
-            meter_metric[1])
+            ("stats.meter.gorets.1min_rate", 0.0, self.time_now),
+            messages[1])
         self.assertEqual(
-            "stats.meter.gorets.1min_rate 0.0 %s" % self.time_now,
-            meter_metric[2])
+            ("stats.meter.gorets.5min_rate", 0.0, self.time_now),
+            messages[2])
         self.assertEqual(
-            "stats.meter.gorets.5min_rate 0.0 %s" % self.time_now,
-            meter_metric[3])
+            ("stats.meter.gorets.count", 3.0, self.time_now),
+            messages[3])
         self.assertEqual(
-            "stats.meter.gorets.15min_rate 0.0 %s" % self.time_now,
-            meter_metric[4])
+            ("stats.meter.gorets.mean_rate", 3.0, self.time_now),
+            messages[4])
         self.assertEqual(
-            "statsd.numStats 1 %s" % self.time_now,
-            messages[1].splitlines()[0])
+            ("statsd.numStats", 1, self.time_now),
+            messages[5])
 
         # As we are employing the expected results from test_ewma.py
         # we perform the initial tick(), before advancing the clock 60sec.
@@ -319,22 +312,21 @@ class FlushMeterMetricMessagesTest(TestCase):
         self.mark_minutes(1)
         self.time_now += 60
         messages = self.processor.flush()
-        self.assertEqual(2, len(messages))
-        meter_metric = messages[0].splitlines()
+        self.assertEqual(6, len(messages))
         self.assertEqual(
-            "stats.meter.gorets.count 3.0 %s" % self.time_now,
-            meter_metric[0])
-        self.assertTrue(
-            meter_metric[1].startswith(
-                "stats.meter.gorets.mean_rate 0.04918032"))
-        self.assertTrue(
-            meter_metric[2].startswith(
-                "stats.meter.gorets.1min_rate 0.22072766"))
-        self.assertTrue(
-            meter_metric[3].startswith(
-                "stats.meter.gorets.5min_rate 0.49123845"))
-        self.assertTrue(
-            meter_metric[4].startswith(
-                "stats.meter.gorets.15min_rate 0.5613041"))
+            ("stats.meter.gorets.15min_rate", 0.561304, self.time_now),
+            messages[0])
         self.assertEqual(
-            "statsd.numStats 1 %s" % self.time_now, messages[1].splitlines()[0])
+            ("stats.meter.gorets.1min_rate", 0.220728, self.time_now),
+            messages[1])
+        self.assertEqual(
+            ("stats.meter.gorets.5min_rate", 0.491238, self.time_now),
+            messages[2])
+        self.assertEqual(
+            ("stats.meter.gorets.count", 3.0, self.time_now),
+            messages[3])
+        self.assertEqual(
+            ("stats.meter.gorets.mean_rate", 0.049180, self.time_now),
+            messages[4])
+        self.assertEqual(
+            ("statsd.numStats", 1, self.time_now), messages[5])

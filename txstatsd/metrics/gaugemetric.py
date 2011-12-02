@@ -27,9 +27,6 @@ class GaugeMetric(Metric):
 class GaugeMetricReporter(object):
     """A gauge metric is an instantaneous reading of a particular value."""
 
-    MESSAGE = (
-        "$prefix%(key)s.value %(value)s %(timestamp)s\n")
-
     def __init__(self, name, prefix=""):
         """Construct a metric we expect to be periodically updated.
 
@@ -38,17 +35,12 @@ class GaugeMetricReporter(object):
         self.name = name
 
         if prefix:
-            prefix += '.'
-        self.message = Template(GaugeMetricReporter.MESSAGE).substitute(
-            prefix=prefix)
-
+            prefix += "."
+        self.prefix = prefix
         self.value = 0
 
     def mark(self, value):
         self.value = value
 
     def report(self, timestamp):
-        return self.message % {
-            "key": self.name,
-            "value": self.value,
-            "timestamp": timestamp}
+        return [(self.prefix + self.name + ".value", self.value, timestamp)]
