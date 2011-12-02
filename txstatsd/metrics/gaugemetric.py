@@ -1,6 +1,3 @@
-
-from string import Template
-
 from txstatsd.metrics.metric import Metric
 
 

@@ -1,6 +1,3 @@
-
-from string import Template
-
 import time
 
 from txstatsd.metrics.histogrammetric import HistogramMetricReporter

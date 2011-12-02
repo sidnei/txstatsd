@@ -7,6 +7,7 @@ from txstatsd.stats.uniformsample import UniformSample
 
 
 class TestHistogramReporterMetric(TestCase):
+
     def test_histogram_with_zero_recorded_values(self):
         sample = UniformSample(100)
         histogram = HistogramMetricReporter(sample)
@@ -36,20 +37,6 @@ class TestHistogramReporterMetric(TestCase):
 
         self.assertEqual(len(histogram.get_values()), 0,
                          'Should have no values')
-
-    def test_histogram_of_numbers_1_through_10000(self):
-        sample = UniformSample(100000)
-        histogram = HistogramMetricReporter(sample)
-        for i in range(1, 10001):
-            histogram.update(i)
-    
-        self.assertEqual(histogram.count, 10000,
-                         'Should have a count of 10000')
-    
-        self.assertEqual(histogram.max(), 10000,
-                         'Should have a max of 10000')
-        self.assertEqual(histogram.min(), 1,
-                         'Should have a min of 1')
 
     def test_histogram_of_numbers_1_through_10000(self):
         sample = UniformSample(100000)

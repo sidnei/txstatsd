@@ -11,8 +11,6 @@ And extended for sliding windows.
 import random
 import time
 
-from string import Template
-
 from zope.interface import implements
 
 from txstatsd.metrics.metric import Metric
