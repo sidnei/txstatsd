@@ -1,7 +1,9 @@
 """Tests for the Metrics convenience class."""
 
+import re
+import time
 from unittest import TestCase
-
+from txstatsd.metrics.extendedmetrics import ExtendedMetrics
 from txstatsd.metrics.metrics import Metrics
 
 
@@ -49,9 +51,39 @@ class TestMetrics(TestCase):
 
     def test_timing(self):
         """Test the timing operation."""
-        self.metrics.timing('timing', 101123)
+        self.metrics.timing('timing', 101.1234)
         self.assertEqual(self.connection.data,
-                         'txstatsd.tests.timing:101123|ms')
+                         'txstatsd.tests.timing:101123.4|ms')
+
+    def test_timing_automatic(self):
+        """Test the automatic timing operation with explicit reset"""
+        start_time = time.time()
+
+        self.metrics.reset_timing()
+        time.sleep(.1)
+        self.metrics.timing('timing')
+
+        elapsed = time.time() - start_time
+
+        label, val, units = re.split(":|\|", self.connection.data)
+        self.assertEqual(label, 'txstatsd.tests.timing')
+        self.assertEqual(units, 'ms')
+        self.assertTrue(100 <= float(val) <= elapsed * 1000)
+
+    def test_timing_automatic_implicit_reset(self):
+        """Test the automatic timing operation with implicit reset"""
+        start_time = time.time()
+
+        self.metrics.timing('something_else')
+        time.sleep(.1)
+        self.metrics.timing('timing')
+
+        elapsed = time.time() - start_time
+
+        label, val, units = re.split(":|\|", self.connection.data)
+        self.assertEqual(label, 'txstatsd.tests.timing')
+        self.assertEqual(units, 'ms')
+        self.assertTrue(100 <= float(val) <= elapsed * 1000)
 
     def test_generic(self):
         """Test the GenericMetric class."""
@@ -70,3 +102,19 @@ class TestMetrics(TestCase):
         self.metrics.gauge('gauge', 413)
         self.assertEqual(self.connection.data,
                          'gauge:413|g')
+
+
+class TestExtendedMetrics(TestMetrics):
+    def setUp(self):
+        super(TestExtendedMetrics, self).setUp()
+        self.metrics = ExtendedMetrics(self.connection, 'txstatsd.tests')
+
+    def test_counter(self):
+        """Test the increment and decrement operations."""
+        self.metrics.increment('counter', 18)
+        self.assertEqual(self.connection.data,
+                         'txstatsd.tests.counter:18|c')
+        self.metrics.decrement('counter', 9)
+        self.assertEqual(self.connection.data,
+                         'txstatsd.tests.counter:9|c')
+
