@@ -8,7 +8,7 @@ from txstatsd.server.loggingprocessor import LoggingMessageProcessor
 
 class FakeMeterMetric(object):
     def report(self, *args):
-        return 'Sample report'
+        return [('Sample report', 1, 2)]
 
 class TestLogger(object):
     def __init__(self):
@@ -44,7 +44,9 @@ class TestLoggingMessageProcessor(TestCase):
         metric = FakeMeterMetric()
         processor.meter_metrics['test'] = metric
         processor.flush()
-        self.assertEqual(metric.report() + "\n", logger.log)
+        expected = "\n".join(["%s %s %s" % message
+                              for message in metric.report()])
+        self.assertEqual(expected + "\n", logger.log)
 
     def test_logger_plugin(self):
         logger = TestLogger()
@@ -53,7 +55,9 @@ class TestLoggingMessageProcessor(TestCase):
             time_function=lambda: 42)
         processor.process("gorets:17|pd")
         processor.flush()
-        self.assertEqual(processor.plugin_metrics['gorets'].flush(
-                                10, processor.time_function()),
-                         logger.log)
+        messages = processor.plugin_metrics['gorets'].flush(
+            10, processor.time_function())
+        expected = "\n".join(["%s %s %s" % message
+                              for message in messages])
+        self.assertEqual(expected + "\n", logger.log)
 

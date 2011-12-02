@@ -13,9 +13,9 @@ class FakeProcessor(object):
         self.sequence = 0
 
     def flush(self, interval):
-        """Always produce a sequence number followed by 9 lines of output"""
+        """Always produce a sequence number"""
         self.sequence += 1
-        return [str(self.sequence)]
+        return [("foo.bar", str(self.sequence), 42)]
 
 
 class FakeTransport(object):
@@ -68,7 +68,7 @@ class TestGraphiteProtocol(TestCase):
         self.clock.advance(1)
         self.assertEqual(2, len(self.transport.messages))
         # Last message is the message graphite metric.
-        self.assertEqual("3", self.transport.messages[-2])
+        self.assertEqual("foo.bar 3 42\n", self.transport.messages[-2])
 
     def test_stopped_producer_discards_everything(self):
         """

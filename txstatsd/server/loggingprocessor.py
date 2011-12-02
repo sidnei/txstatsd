@@ -28,9 +28,9 @@ class LoggingMessageProcessor(ConfigurableMessageProcessor):
 
         def log_metrics(metrics):
             for metric in metrics.itervalues():
-                report = metric.report(timestamp)
-                for measurement in report.splitlines():
-                    self.logger.info(measurement)
+                messages = metric.report(timestamp)
+                for measurement in messages:
+                    self.logger.info("%s %s %s" % measurement)
 
         log_metrics(self.counter_metrics)
         log_metrics(self.gauge_metrics)
@@ -38,7 +38,6 @@ class LoggingMessageProcessor(ConfigurableMessageProcessor):
         log_metrics(self.timer_metrics)
         
         for metric in self.plugin_metrics.itervalues():
-            report = metric.flush(interval, timestamp)
-            for measurement in report.splitlines():
-                self.logger.info(measurement)
+            for measurement in metric.flush(interval, timestamp):
+                self.logger.info("%s %s %s" % measurement)
 

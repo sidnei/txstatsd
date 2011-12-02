@@ -1,8 +1,4 @@
-
 import math
-import sys
-
-from string import Template
 
 from txstatsd.stats.exponentiallydecayingsample \
     import ExponentiallyDecayingSample
@@ -17,18 +13,6 @@ class HistogramMetricReporter(object):
     - U{Accurately computing running variance
           <http://www.johndcook.com/standard_deviation.html>}
     """
-
-    MESSAGE = (
-        "$prefix%(key)s.min %(min)s %(timestamp)s\n"
-        "$prefix%(key)s.max %(max)s %(timestamp)s\n"
-        "$prefix%(key)s.mean %(mean)s %(timestamp)s\n"
-        "$prefix%(key)s.stddev %(lower)s %(timestamp)s\n"
-        "$prefix%(key)s.median %(count)s %(timestamp)s\n"
-        "$prefix%(key)s.75percentile %(75percentile)s %(timestamp)s\n"
-        "$prefix%(key)s.95percentile %(95percentile)s %(timestamp)s\n"
-        "$prefix%(key)s.98percentile %(98percentile)s %(timestamp)s\n"
-        "$prefix%(key)s.99percentile %(99percentile)s %(timestamp)s\n"
-        "$prefix%(key)s.999percentile %(999percentile)s %(timestamp)s\n")
 
     @classmethod
     def using_uniform_sample(cls, prefix=""):
@@ -59,9 +43,8 @@ class HistogramMetricReporter(object):
         self.sample = sample
 
         if prefix:
-            prefix += '.'
-        self.message = Template(HistogramMetricReporter.MESSAGE).substitute(
-            prefix=prefix)
+            prefix += "."
+        self.prefix = prefix
 
         self._min = 0
         self._max = 0
@@ -98,20 +81,22 @@ class HistogramMetricReporter(object):
     def report(self, timestamp):
         # median, 75, 95, 98, 99, 99.9 percentile
         percentiles = self.percentiles(0.5, 0.75, 0.95, 0.98, 0.99, 0.999)
+        metrics = []
+        items = {
+            ".min": self.min(),
+            ".max": self.max(),
+            ".mean": self.mean(),
+            ".stddev": self.std_dev(),
+            ".median": percentiles[0],
+            ".75percentile": percentiles[1],
+            ".95percentile": percentiles[2],
+            ".98percentile": percentiles[3],
+            ".99percentile": percentiles[4],
+            ".999percentile": percentiles[5]}
 
-        return self.message % {
-            "key": self.name,
-            "min": self.min(),
-            "max": self.max(),
-            "mean": self.mean(),
-            "stddev": self.std_dev(),
-            "median": percentiles[0],
-            "75percentile": percentiles[1],
-            "95percentile": percentiles[2],
-            "98percentile": percentiles[3],
-            "99percentile": percentiles[4],
-            "999percentile": percentiles[5],
-            "timestamp": timestamp}
+        for item, value in items.itervalues():
+            metrics.append((self.prefix + self.name + item, value, timestamp))
+        return metrics
 
     def min(self):
         """Returns the smallest recorded value."""

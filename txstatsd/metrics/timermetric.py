@@ -39,18 +39,6 @@ class TimerMetricReporter(object):
     statistics, plus throughput statistics via L{MeterMetricReporter}.
     """
 
-    MESSAGE = (
-        "$prefix%(key)s.min %(min)s %(timestamp)s\n"
-        "$prefix%(key)s.max %(max)s %(timestamp)s\n"
-        "$prefix%(key)s.mean %(mean)s %(timestamp)s\n"
-        "$prefix%(key)s.stddev %(stddev)s %(timestamp)s\n"
-        "$prefix%(key)s.median %(median)s %(timestamp)s\n"
-        "$prefix%(key)s.75percentile %(75percentile)s %(timestamp)s\n"
-        "$prefix%(key)s.95percentile %(95percentile)s %(timestamp)s\n"
-        "$prefix%(key)s.98percentile %(98percentile)s %(timestamp)s\n"
-        "$prefix%(key)s.99percentile %(99percentile)s %(timestamp)s\n"
-        "$prefix%(key)s.999percentile %(999percentile)s %(timestamp)s\n")
-
     def __init__(self, name, wall_time_func=time.time, prefix=""):
         """Construct a metric we expect to be periodically updated.
 
@@ -63,14 +51,13 @@ class TimerMetricReporter(object):
         self.wall_time_func = wall_time_func
 
         if prefix:
-            prefix += '.'
-        self.message = Template(TimerMetricReporter.MESSAGE).substitute(
-            prefix=prefix)
+            prefix += "."
+        self.prefix = prefix
 
         sample = ExponentiallyDecayingSample(1028, 0.015)
         self.histogram = HistogramMetricReporter(sample)
         self.meter = MeterMetricReporter(
-            'calls', wall_time_func=self.wall_time_func)
+            "calls", wall_time_func=self.wall_time_func)
         self.clear()
 
     def clear(self):
@@ -137,17 +124,19 @@ class TimerMetricReporter(object):
     def report(self, timestamp):
         # median, 75, 95, 98, 99, 99.9 percentile
         percentiles = self.percentiles(0.5, 0.75, 0.95, 0.98, 0.99, 0.999)
+        metrics = []
+        items = {".min": self.min(),
+                 ".max": self.max(),
+                 ".mean": self.mean(),
+                 ".stddev": self.std_dev(),
+                 ".median": percentiles[0],
+                 ".75percentile": percentiles[1],
+                 ".95percentile": percentiles[2],
+                 ".98percentile": percentiles[3],
+                 ".99percentile": percentiles[4],
+                 ".999percentile": percentiles[5]}
 
-        return self.message % {
-            "key": self.name,
-            "min": self.min(),
-            "max": self.max(),
-            "mean": self.mean(),
-            "stddev": self.std_dev(),
-            "median": percentiles[0],
-            "75percentile": percentiles[1],
-            "95percentile": percentiles[2],
-            "98percentile": percentiles[3],
-            "99percentile": percentiles[4],
-            "999percentile": percentiles[5],
-            "timestamp": timestamp}
+        for item, value in items.iteritems():
+            metrics.append((self.prefix + self.name + item,
+                            round(value, 6), timestamp))
+        return metrics

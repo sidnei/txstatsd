@@ -14,6 +14,7 @@ import time
 from string import Template
 
 from zope.interface import implements
+
 from txstatsd.metrics.metric import Metric
 from txstatsd.itxstatsd import IMetric
 
@@ -106,12 +107,6 @@ class DistinctMetricReporter(object):
     """
     implements(IMetric)
 
-    MESSAGE = (
-        "$prefix%(key)s.count_1min %(count_1min)s %(timestamp)s\n"
-        "$prefix%(key)s.count_1hour %(count_1hour)s %(timestamp)s\n"
-        "$prefix%(key)s.count_1day %(count_1day)s %(timestamp)s\n"
-        "$prefix%(key)s.count %(count)s %(timestamp)s\n")
-
     def __init__(self, name, wall_time_func=time.time, prefix=""):
         """Construct a metric we expect to be periodically updated.
 
@@ -124,9 +119,8 @@ class DistinctMetricReporter(object):
         self.wall_time_func = wall_time_func
         self.counter = SlidingDistinctCounter(32, 32)
         if prefix:
-            prefix += '.'
-        self.message = Template(DistinctMetricReporter.MESSAGE).substitute(
-            prefix=prefix)
+            prefix += "."
+        self.prefix = prefix
 
     def count(self):
         return self.counter.distinct()
@@ -148,10 +142,11 @@ class DistinctMetricReporter(object):
 
     def flush(self, interval, timestamp):
         now = self.wall_time_func()
-        return self.message % {
-            "key": self.name,
-            "count": self.count(),
-            "count_1min": self.count_1min(now),
-            "count_1hour": self.count_1hour(now),
-            "count_1day": self.count_1day(now),
-            "timestamp": timestamp}
+        metrics = []
+        items = {".count": self.count(),
+                 ".count_1min": self.count_1min(now),
+                 ".count_1hour": self.count_1hour(now),
+                 ".count_1day": self.count_1day(now)}
+        for item, value in items.iteritems():
+            metrics.append((self.prefix + self.name + item, value, timestamp))
+        return metrics

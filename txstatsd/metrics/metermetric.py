@@ -1,6 +1,3 @@
-
-from string import Template
-
 import time
 
 from txstatsd.metrics.metric import Metric
@@ -44,13 +41,6 @@ class MeterMetricReporter(object):
     <http://en.wikipedia.org/wiki/Moving_average#Exponential_moving_average>}
     """
 
-    MESSAGE = (
-        "$prefix%(key)s.count %(count)s %(timestamp)s\n"
-        "$prefix%(key)s.mean_rate %(mean_rate)s %(timestamp)s\n"
-        "$prefix%(key)s.1min_rate %(rate_1min)s %(timestamp)s\n"
-        "$prefix%(key)s.5min_rate %(rate_5min)s %(timestamp)s\n"
-        "$prefix%(key)s.15min_rate %(rate_15min)s %(timestamp)s\n")
-
     def __init__(self, name, wall_time_func=time.time, prefix=""):
         """Construct a metric we expect to be periodically updated.
 
@@ -61,9 +51,8 @@ class MeterMetricReporter(object):
         self.wall_time_func = wall_time_func
 
         if prefix:
-            prefix += '.'
-        self.message = Template(MeterMetricReporter.MESSAGE).substitute(
-            prefix=prefix)
+            prefix += "."
+        self.prefix = prefix
 
         self.m1_rate = Ewma.one_minute_ewma()
         self.m5_rate = Ewma.five_minute_ewma()
@@ -85,14 +74,17 @@ class MeterMetricReporter(object):
         self.m15_rate.tick()
 
     def report(self, timestamp):
-        return self.message % {
-            "key": self.name,
-            "count": self.count,
-            "mean_rate": self.mean_rate(),
-            "rate_1min": self.one_minute_rate(),
-            "rate_5min": self.five_minute_rate(),
-            "rate_15min": self.fifteen_minute_rate(),
-            "timestamp": timestamp}
+        metrics = []
+        items = {".count": self.count,
+                 ".mean_rate": self.mean_rate(),
+                 ".1min_rate": self.one_minute_rate(),
+                 ".5min_rate": self.five_minute_rate(),
+                 ".15min_rate": self.fifteen_minute_rate()}
+
+        for item, value in items.iteritems():
+            metrics.append((self.prefix  + self.name + item,
+                            round(value, 6), timestamp))
+        return metrics
 
     def fifteen_minute_rate(self):
         return self.m15_rate.rate

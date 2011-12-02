@@ -77,7 +77,7 @@ class GraphiteProtocol(Protocol):
         """Flush messages queued in the processor to Graphite."""
         for message in self.processor.flush(interval=self.interval):
             if self.connected and not self.paused:
-                self.transport.write(message)
+                self.transport.write("%s %s %s\n" % message)
 
         self.flush_message_graphite_metric()
 

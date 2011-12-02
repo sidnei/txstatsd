@@ -34,28 +34,15 @@ class MessageProcessor(object):
     <txstatsd.server.configurableprocessor.ConfigurableMessageProcessor>}).
     """
 
-    COUNTERS_MESSAGE = (
-        "stats.%(key)s %(value)s %(timestamp)s\n"
-        "stats_counts.%(key)s %(count)s %(timestamp)s\n")
-
-    TIMERS_MESSAGE = (
-        "stats.timers.%(key)s.mean %(mean)s %(timestamp)s\n"
-        "stats.timers.%(key)s.upper %(upper)s %(timestamp)s\n"
-        "stats.timers.%(key)s.upper_%(percent)s %(threshold_upper)s"
-            " %(timestamp)s\n"
-        "stats.timers.%(key)s.lower %(lower)s %(timestamp)s\n"
-        "stats.timers.%(key)s.count %(count)s %(timestamp)s\n")
-
-    GAUGE_METRIC_MESSAGE = (
-        "stats.gauge.%(key)s.value %(value)s %(timestamp)s\n")
-
     def __init__(self, time_function=time.time, plugins=None):
         self.time_function = time_function
 
-        self.counters_message = MessageProcessor.COUNTERS_MESSAGE
-        self.timers_message = MessageProcessor.TIMERS_MESSAGE
-        self.gauge_metric_message = MessageProcessor.GAUGE_METRIC_MESSAGE
-
+        self.stats_prefix = "stats."
+        self.metrics_summary = "statsd.numStats"
+        self.count_prefix = "stats_counts."
+        self.timer_prefix = self.stats_prefix + "timers."
+        self.gauge_prefix = self.stats_prefix + "gauge."
+    
         self.timer_metrics = {}
         self.counter_metrics = {}
         self.gauge_metrics = deque()
@@ -197,27 +184,27 @@ class MessageProcessor(object):
         counter_metrics, events = self.flush_counter_metrics(interval,
                                                              timestamp)
         if events > 0:
-            messages.extend(counter_metrics)
+            messages.extend(sorted(counter_metrics))
             num_stats += events
 
         timer_metrics, events = self.flush_timer_metrics(percent, timestamp)
         if events > 0:
-            messages.extend(timer_metrics)
+            messages.extend(sorted(timer_metrics))
             num_stats += events
 
         gauge_metrics, events = self.flush_gauge_metrics(timestamp)
         if events > 0:
-            messages.extend(gauge_metrics)
+            messages.extend(sorted(gauge_metrics))
             num_stats += events
 
         meter_metrics, events = self.flush_meter_metrics(timestamp)
         if events > 0:
-            messages.extend(meter_metrics)
+            messages.extend(sorted(meter_metrics))
             num_stats += events
 
         plugin_metrics, events = self.flush_plugin_metrics(interval, timestamp)
         if events > 0:
-            messages.extend(plugin_metrics)
+            messages.extend(sorted(plugin_metrics))
             num_stats += events
 
         self.flush_metrics_summary(messages, num_stats, timestamp)
@@ -230,12 +217,8 @@ class MessageProcessor(object):
             self.counter_metrics[key] = 0
 
             value = count / interval
-            message = self.counters_message % {
-                "key": key,
-                "value": value,
-                "count": count,
-                "timestamp": timestamp}
-            metrics.append(message)
+            metrics.append((self.stats_prefix + key, value, timestamp))
+            metrics.append((self.count_prefix + key, count, timestamp))
             events += 1
 
         return (metrics, events)
@@ -264,16 +247,13 @@ class MessageProcessor(object):
                     threshold_upper = timers[-1]
                     mean = sum(timers) / index
 
-                message = self.timers_message % {
-                    "key": key,
-                    "mean": mean,
-                    "upper": upper,
-                    "percent": percent,
-                    "threshold_upper": threshold_upper,
-                    "lower": lower,
-                    "count": count,
-                    "timestamp": timestamp}
-                metrics.append(message)
+                items = {".mean": mean,
+                         ".upper": upper,
+                         ".upper_%s" % percent: threshold_upper,
+                         ".lower": lower,
+                         ".count": count}
+                for item, value in items.iteritems():
+                    metrics.append((self.timer_prefix + key + item, value, timestamp))
                 events += 1
 
         return (metrics, events)
@@ -285,11 +265,7 @@ class MessageProcessor(object):
             value = metric[0]
             key = metric[1]
 
-            message = self.gauge_metric_message % {
-                "key": key,
-                "value": value,
-                "timestamp": timestamp}
-            metrics.append(message)
+            metrics.append((self.gauge_prefix + key + ".value", value, timestamp))
             events += 1
 
         self.gauge_metrics.clear()
@@ -300,8 +276,8 @@ class MessageProcessor(object):
         metrics = []
         events = 0
         for metric in self.meter_metrics.itervalues():
-            message = metric.report(timestamp)
-            metrics.append(message)
+            messages = metric.report(timestamp)
+            metrics.extend(messages)
             events += 1
 
         return (metrics, events)
@@ -311,14 +287,14 @@ class MessageProcessor(object):
         events = 0
 
         for metric in self.plugin_metrics.itervalues():
-            message = metric.flush(interval, timestamp)
-            metrics.append(message)
+            messages = metric.flush(interval, timestamp)
+            metrics.extend(messages)
             events += 1
 
         return (metrics, events)
 
     def flush_metrics_summary(self, messages, num_stats, timestamp):
-        messages.append("statsd.numStats %s %s\n" % (num_stats, timestamp))
+        messages.append((self.metrics_summary, num_stats, timestamp))
 
     def update_metrics(self):
         for metric in self.meter_metrics.itervalues():
