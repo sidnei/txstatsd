@@ -25,7 +25,32 @@ def normalize_key(key):
     return key
 
 
-class MessageProcessor(object):
+class BaseMessageProcessor(object):
+
+    def process(self, message):
+        """
+        """
+        if not ":" in message:
+            return self.fail(message)
+
+        key, data = message.strip().split(":", 1)
+        if not "|" in data:
+            return self.fail(message)
+
+        fields = data.split("|")
+        if len(fields) < 2 or len(fields) > 3:
+            return self.fail(message)
+
+        key = normalize_key(key)
+        metric_type = fields[1]
+        return self.process_message(message, metric_type, key, fields)
+
+    def fail(self, message):
+        """Log and discard malformed message."""
+        log.msg("Bad line: %r" % message, logLevel=logging.DEBUG)
+
+
+class MessageProcessor(BaseMessageProcessor):
     """
     This C{MessageProcessor} produces StatsD-compliant messages
     for publishing to a Graphite server.
@@ -42,7 +67,7 @@ class MessageProcessor(object):
         self.count_prefix = "stats_counts."
         self.timer_prefix = self.stats_prefix + "timers."
         self.gauge_prefix = self.stats_prefix + "gauge."
-    
+
         self.timer_metrics = {}
         self.counter_metrics = {}
         self.gauge_metrics = deque()
@@ -56,29 +81,11 @@ class MessageProcessor(object):
             for plugin in plugins:
                 self.plugins[plugin.metric_type] = plugin
 
-    def fail(self, message):
-        """Log and discard malformed message."""
-        log.msg("Bad line: %r" % message, logLevel=logging.DEBUG)
-
-    def process(self, message):
+    def process_message(self, message, metric_type, key, fields):
         """
         Process a single entry, adding it to either C{counters}, C{timers},
         or C{gauge_metrics} depending on which kind of message it is.
         """
-        if not ":" in message:
-            return self.fail(message)
-
-        key, data = message.strip().split(":", 1)
-        if not "|" in data:
-            return self.fail(message)
-
-        fields = data.split("|")
-        if len(fields) < 2 or len(fields) > 3:
-            return self.fail(message)
-
-        key = normalize_key(key)
-        metric_type = fields[1]
-
         if metric_type == "c":
             self.process_counter_metric(key, fields, message)
         elif metric_type == "ms":
@@ -253,7 +260,8 @@ class MessageProcessor(object):
                          ".lower": lower,
                          ".count": count}
                 for item, value in items.iteritems():
-                    metrics.append((self.timer_prefix + key + item, value, timestamp))
+                    metrics.append((self.timer_prefix + key + item,
+                                    value, timestamp))
                 events += 1
 
         return (metrics, events)
@@ -265,7 +273,8 @@ class MessageProcessor(object):
             value = metric[0]
             key = metric[1]
 
-            metrics.append((self.gauge_prefix + key + ".value", value, timestamp))
+            metrics.append((self.gauge_prefix + key + ".value",
+                            value, timestamp))
             events += 1
 
         self.gauge_metrics.clear()
