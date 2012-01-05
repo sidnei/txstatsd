@@ -23,6 +23,7 @@ class StopProcessingException(Exception):
 
     pass
 
+
 class Router(BaseMessageProcessor):
 
     def __init__(self, message_processor, rules_config):
