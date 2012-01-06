@@ -1,4 +1,3 @@
-
 import ConfigParser
 import tempfile
 from unittest import TestCase
@@ -21,29 +20,29 @@ class GlueOptionsTestCase(TestCase):
         """
         class TestOptions(service.OptionsGlue):
             optParameters = [["test", "t", "default", "help"]]
-    
+
         o = TestOptions()
         o.parseOptions([])
         self.assertEquals("default", o["test"])
-    
+
     def test_set_parameter(self):
         """
         A parameter can be set from the command line
         """
         class TestOptions(service.OptionsGlue):
             optParameters = [["test", "t", "default", "help"]]
-    
+
         o = TestOptions()
         o.parseOptions(["--test", "notdefault"])
         self.assertEquals("notdefault", o["test"])
-    
+
     def test_no_config_option(self):
         """
         A parameter can be set from the command line
         """
         class TestOptions(service.OptionsGlue):
             optParameters = [["config", "c", "default", "help"]]
-    
+
         self.assertRaises(ValueError, lambda: TestOptions())
 
     def get_file_parser(self, glue_parameters_config=None, **kwargs):
@@ -105,12 +104,12 @@ class GlueOptionsTestCase(TestCase):
         f, o = self.get_file_parser([["number", "n", 5, "help", int]])
         o.parseOptions(["--config", f.name])
         self.assertEquals(5, o["number"])
-        
+
     def test_support_plugin_sections(self):
         class TestOptions(service.OptionsGlue):
             optParameters = [["test", "t", "default", "help"]]
             config_section = "statsd"
-            
+
         o = TestOptions()
         config_file = ConfigParser.RawConfigParser()
         config_file.readfp(StringIO("[statsd]\n\n[plugin_test]\nfoo = bar\n"))

@@ -4,7 +4,7 @@ import socket
 import sys
 import ConfigParser
 
-from twisted.application.internet import TCPClient, UDPServer
+from twisted.application.internet import TCPClient, UDPServer, TCPServer
 from twisted.application.service import MultiService
 from twisted.python import usage
 from twisted.plugin import getPlugins
@@ -14,7 +14,8 @@ from txstatsd.metrics.metrics import Metrics
 from txstatsd.server.processor import MessageProcessor
 from txstatsd.server.configurableprocessor import ConfigurableMessageProcessor
 from txstatsd.server.protocol import (
-    GraphiteClientFactory, StatsDServerProtocol)
+    GraphiteClientFactory, StatsDServerProtocol, StatsDTCPServerFactory)
+from txstatsd.server.router import Router
 from txstatsd.report import ReportingService
 from txstatsd.itxstatsd import IMetricFactory
 
@@ -127,7 +128,11 @@ class StatsDOptions(OptionsGlue):
         ["monitor-response", "o", "txstatsd pong",
          "Response we should send monitoring agent.", str],
         ["statsd-compliance", "s", 1,
-         "Produce StatsD-compliant messages.", int]]
+         "Produce StatsD-compliant messages.", int],
+        ["routing", "g", "",
+         "Routing rules", str],
+        ["listen-tcp-port", "t", None,
+         "Routing rules", int]]
 
     def __init__(self):
         self.config_section = 'statsd'
@@ -152,12 +157,14 @@ def createService(options):
 
     if options["statsd-compliance"]:
         processor = MessageProcessor(plugins=plugin_metrics)
-        connection = InternalClient(processor)
+        router = Router(processor, options['routing'], service)
+        connection = InternalClient(router)
         metrics = Metrics(connection, namespace=prefix)
     else:
         processor = ConfigurableMessageProcessor(message_prefix=prefix,
                                                  plugins=plugin_metrics)
-        connection = InternalClient(processor)
+        router = Router(processor, options['routing'], service)
+        connection = InternalClient(router)
         metrics = Metrics(connection)
 
     if options["report"] is not None:
@@ -188,10 +195,21 @@ def createService(options):
     client.setServiceParent(service)
 
     statsd_server_protocol = StatsDServerProtocol(
-        processor,
+        router,
         monitor_message=options["monitor-message"],
         monitor_response=options["monitor-response"])
+
     listener = UDPServer(options["listen-port"], statsd_server_protocol)
     listener.setServiceParent(service)
+
+    if options["listen-tcp-port"] is not None:
+        statsd_tcp_server_factory = StatsDTCPServerFactory(
+                router,
+                monitor_message=options["monitor-message"],
+                monitor_response=options["monitor-response"])
+
+        listener = TCPServer(options["listen-tcp-port"],
+            statsd_tcp_server_factory)
+        listener.setServiceParent(service)
 
     return service
