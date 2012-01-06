@@ -23,6 +23,11 @@ class ProcessMessagesTest(TestCase):
     def setUp(self):
         self.processor = TestMessageProcessor()
 
+    def test_rebuild_message(self):
+        self.assertEquals(
+            self.processor.rebuild_message("c", "gorets", ["1", "c"]),
+            "gorets:1|c")
+
     def test_receive_counter(self):
         """
         A counter message takes the format 'gorets:1|c', where 'gorets' is the

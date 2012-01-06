@@ -45,6 +45,9 @@ class BaseMessageProcessor(object):
         metric_type = fields[1]
         return self.process_message(message, metric_type, key, fields)
 
+    def rebuild_message(self, metric_type, key, fields):
+        return key + ":" + "|".join(fields)
+
     def fail(self, message):
         """Log and discard malformed message."""
         log.msg("Bad line: %r" % message, logLevel=logging.DEBUG)
