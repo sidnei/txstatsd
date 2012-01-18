@@ -1,4 +1,5 @@
 import time
+import itertools
 
 from zope.interface import implements
 
@@ -41,13 +42,16 @@ class GraphiteProtocol(Protocol):
     implements(interfaces.IPushProducer)
 
     def __init__(self, processor, interval, clock=None,
-                logger=None, prefix=''):
+                logger=None, prefix='', time_function=None):
         from twisted.internet import reactor
 
         self.reactor = reactor
         self.paused = False
         self.processor = processor
         self.interval = interval
+        if time_function is None:
+            time_function = time.time
+        self.time_function = time_function
 
         if logger is not None:
             logger_info = getattr(logger, 'info', None)
@@ -75,7 +79,9 @@ class GraphiteProtocol(Protocol):
 
     def flushProcessor(self):
         """Flush messages queued in the processor to Graphite."""
-        for message in self.processor.flush(interval=self.interval):
+        for message in itertools.chain(
+            self.processor.flush(interval=self.interval),
+            self.flush_message_graphite_metric()):
             if self.connected and not self.paused:
                 self.transport.write("%s %s %s\n" % message)
 
@@ -83,24 +89,25 @@ class GraphiteProtocol(Protocol):
 
     def flush_message_graphite_metric(self):
         """Record whether we are paused or not."""
+        messages = []
         if self.connected and not self.paused:
             if self.pause_began is None:
-                timestamp = int(time.time())
+                timestamp = int(self.time_function())
             else:
-                paused_period = int(time.time() - self.pause_began)
+                paused_period = int(self.time_function() - self.pause_began)
                 self.total_paused_period += paused_period
                 timestamp = int(self.pause_began)
+                self.pause_began = None
             self.message_graphite_metric.mark(self.total_paused_period)
-            self.transport.write(
-                self.message_graphite_metric.report(timestamp))
-            self.pause_began = None
+            messages.extend(self.message_graphite_metric.report(timestamp))
         else:
             if self.pause_began is None:
-                self.pause_began = time.time()
+                self.pause_began = int(self.time_function())
+        return messages
 
     def pauseProducing(self):
         """Pause producing messages, since the buffer is full."""
-        time_now = int(time.time())
+        time_now = int(self.time_function())
         self.log('Paused messaging Graphite ' + str(time_now))
         self.paused = True
 
@@ -108,7 +115,7 @@ class GraphiteProtocol(Protocol):
 
     def resumeProducing(self):
         """We can write to the transport again. Yay!."""
-        time_now = int(time.time())
+        time_now = int(self.time_function())
         self.log('Resumed messaging Graphite ' + str(time_now))
         self.paused = False
 

@@ -35,7 +35,8 @@ class TestGraphiteProtocol(TestCase):
         self.transport = FakeTransport()
         self.clock = task.Clock()
         self.protocol = GraphiteProtocol(self.processor, 1000,
-                                         clock=self.clock)
+                                         clock=self.clock,
+                                         time_function=lambda: 42)
         self.protocol.transport = self.transport
         self.protocol.connected = True
 
@@ -69,6 +70,7 @@ class TestGraphiteProtocol(TestCase):
         self.assertEqual(2, len(self.transport.messages))
         # Last message is the message graphite metric.
         self.assertEqual("foo.bar 3 42\n", self.transport.messages[-2])
+        self.assertEqual("message.graphite.count 0 42\n", self.transport.messages[-1])
 
     def test_stopped_producer_discards_everything(self):
         """
