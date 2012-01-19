@@ -19,6 +19,10 @@ Conditions supported:
 
 Targets supported:
     drop: will drop the message, stopping any further processing.
+    redirect_udp host port: will send to (host, port) by udp
+    redirect_tcp host port: will send to (host, port) by tcp
+    rewrite pattern repl: will rewrite the path like re.sub
+
 """
 import fnmatch
 import re

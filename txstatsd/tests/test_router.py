@@ -9,9 +9,6 @@ from twisted.trial.unittest import TestCase as TxTestCase
 from txstatsd.server.processor import MessageProcessor
 from txstatsd.server.router import Router
 
-from twisted.internet.base import DelayedCall
-DelayedCall.debug = True
-
 
 class TestMessageProcessor(object):
 
@@ -55,7 +52,7 @@ class RouteMessagesTest(TestCase):
 
     def test_metric_path_like(self):
         """
-        Any message gets dropped with the drop rule.
+        path_like matches glob expressions.
         """
         self.update_rules("path_like goret* => drop")
         self.router.process("gorets:1|c")
