@@ -4,13 +4,17 @@ import tempfile
 from unittest import TestCase
 from StringIO import StringIO
 
+from carbon.client import CarbonClientManager
+
 from twisted.internet.defer import inlineCallbacks, Deferred
 from twisted.internet.protocol import DatagramProtocol
 from twisted.internet.test.reactormixins import ReactorBuilder
+from twisted.application.internet import UDPServer
 
 from txstatsd import service
 from txstatsd.server.processor import MessageProcessor
 from txstatsd.server.protocol import StatsDServerProtocol
+from txstatsd.report import ReportingService
 
 
 class GlueOptionsTestCase(TestCase):
@@ -118,6 +122,59 @@ class GlueOptionsTestCase(TestCase):
         self.assertEquals(o["plugin_test"], config_file.items("plugin_test"))
 
 
+class StatsDOptionsTestCase(TestCase):
+
+    def test_support_multiple_carbon_cache_options(self):
+        """
+        Multiple carbon-cache sections get handled as multiple carbon-cache
+        backend options had been specified in the command line.
+        """
+        o = service.StatsDOptions()
+        config_file = ConfigParser.RawConfigParser()
+        config_file.readfp(StringIO("\n".join([
+            "[statsd]",
+            "[carbon-cache-a]",
+            "carbon-cache-host = 127.0.0.1",
+            "carbon-cache-port = 2004",
+            "carbon-cache-name = a",
+            "[carbon-cache-b]",
+            "carbon-cache-host = 127.0.0.2",
+            "carbon-cache-port = 2005",
+            "carbon-cache-name = b",
+            "[carbon-cache-c]",
+            "carbon-cache-host = 127.0.0.3",
+            "carbon-cache-port = 2006",
+            "carbon-cache-name = c",
+            ])))
+        o.configure(config_file)
+        self.assertEquals(o["carbon-cache-host"],
+                          ["127.0.0.1", "127.0.0.2", "127.0.0.3"])
+        self.assertEquals(o["carbon-cache-port"],
+                          [2004, 2005, 2006])
+        self.assertEquals(o["carbon-cache-name"],
+                          ["a", "b", "c"])
+
+
+class ClientManagerStatsTestCase(TestCase):
+
+    def test_report_client_manager_stats(self):
+        """
+        Calling C{report_client_manager_stats} pokes into carbon's
+        instrumentation stats global dict and pulls out only metrics that start
+        with C{destinations}.
+        """
+        from carbon.instrumentation import stats
+
+        stats["foo"] = 0
+        stats["bar"] = 1
+        stats["destinations.bahamas"] = 2
+        stats["destinations.hawaii"] = 3
+        self.assertEquals({"destinations.bahamas": 2,
+                           "destinations.hawaii": 3},
+                          service.report_client_manager_stats())
+        self.assertEquals({}, stats)
+
+
 class Agent(DatagramProtocol):
 
     def __init__(self):
@@ -136,6 +193,48 @@ class ServiceTestsBuilder(ReactorBuilder):
         o = service.StatsDOptions()
         s = service.createService(o)
         self.assertTrue(isinstance(s, service.MultiService))
+        reporting, manager, statsd, udp = s.services
+        self.assertTrue(isinstance(reporting, ReportingService))
+        self.assertTrue(isinstance(manager, CarbonClientManager))
+        self.assertTrue(isinstance(statsd, service.StatsDService))
+        self.assertTrue(isinstance(udp, UDPServer))
+
+    def test_default_clients(self):
+        """
+        Test that default clients are created when none is specified.
+        """
+        o = service.StatsDOptions()
+        s = service.createService(o)
+        manager = s.services[1]
+        self.assertEqual(sorted(manager.client_factories.keys()),
+                         [("127.0.0.1", 2004, None)])
+
+    def test_multiple_clients(self):
+        """
+        Test that multiple clients are created when the config specifies so.
+        """
+        o = service.StatsDOptions()
+        o["carbon-cache-host"] = ["127.0.0.1", "127.0.0.2"]
+        o["carbon-cache-port"] = [2004, 2005]
+        o["carbon-cache-name"] = ["a", "b"]
+        s = service.createService(o)
+        manager = s.services[1]
+        self.assertEqual(sorted(manager.client_factories.keys()),
+                         [("127.0.0.1", 2004, "a"),
+                          ("127.0.0.2", 2005, "b")])
+
+    def test_carbon_client_options(self):
+        """
+        Options for carbon-client get set into carbon's settings object.
+        """
+        from carbon.conf import settings
+
+        o = service.StatsDOptions()
+        o["max-queue-size"] = 10001
+        o["max-datapoints-per-message"] = 10002
+        service.createService(o)
+        self.assertEqual(settings.MAX_QUEUE_SIZE, 10001)
+        self.assertEqual(settings.MAX_DATAPOINTS_PER_MESSAGE, 10002)
 
     def test_monitor_response(self):
         """
