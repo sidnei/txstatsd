@@ -178,13 +178,8 @@ class StatsDService(Service):
 
     def flushProcessor(self):
         """Flush messages queued in the processor to Graphite."""
-        for message in self.processor.flush(interval=self.flush_interval):
-            # XXX This is nasty. We should instead change 'flush' to not build up
-            # strings so that we can use the pickle-based protocol with less
-            # overhead.
-            for line in filter(None, message.splitlines()):
-                metric, value, timestamp = line.split()
-                self.carbon_client.sendDatapoint(metric, (timestamp, value))
+        for metric, value, timestamp in self.processor.flush(interval=self.flush_interval):
+            self.carbon_client.sendDatapoint(metric, (timestamp, value))
 
     def startService(self):
         self.flush_task.start(self.flush_interval / 1000, False)
