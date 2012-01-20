@@ -94,7 +94,7 @@ class OptionsGlue(usage.Options):
         for name, value in config_file.items(self.config_section):
             self._coerce_option(name, value)
 
-        for section in config_file.sections():
+        for section in sorted(config_file.sections()):
             if section.startswith("plugin_"):
                 self[section] = config_file.items(section)
             if section.startswith("carbon-cache"):
