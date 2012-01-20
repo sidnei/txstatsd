@@ -6,6 +6,7 @@ from twisted.plugin import getPlugins
 from txstatsd.server.processor import MessageProcessor
 from txstatsd.itxstatsd import IMetricFactory
 
+
 class TestMessageProcessor(MessageProcessor):
 
     def __init__(self):
@@ -21,6 +22,11 @@ class ProcessMessagesTest(TestCase):
 
     def setUp(self):
         self.processor = TestMessageProcessor()
+
+    def test_rebuild_message(self):
+        self.assertEquals(
+            self.processor.rebuild_message("c", "gorets", ["1", "c"]),
+            "gorets:1|c")
 
     def test_receive_counter(self):
         """
@@ -245,9 +251,12 @@ class FlushMessagesTest(TestCase):
         messages = self.processor.flush()
         self.assertEqual(5, len(messages))
         self.assertEqual(("stats.pdistinct.gorets.count", 1, 42), messages[0])
-        self.assertEqual(("stats.pdistinct.gorets.count_1day", 5552568545, 42), messages[1])
-        self.assertEqual(("stats.pdistinct.gorets.count_1hour", 5552568545, 42), messages[2])
-        self.assertEqual(("stats.pdistinct.gorets.count_1min", 5552568545, 42), messages[3])
+        self.assertEqual(("stats.pdistinct.gorets.count_1day",
+                        5552568545, 42), messages[1])
+        self.assertEqual(("stats.pdistinct.gorets.count_1hour",
+                        5552568545, 42), messages[2])
+        self.assertEqual(("stats.pdistinct.gorets.count_1min",
+                        5552568545, 42), messages[3])
 
     def test_flush_plugin_arguments(self):
         """Test the passing of arguments for flush."""
@@ -259,7 +268,7 @@ class FlushMessagesTest(TestCase):
 
         self.processor.plugin_metrics["somemetric"] = FakeMetric()
         self.processor.flush(41000)
-        self.assertEquals((41,42),
+        self.assertEquals((41, 42),
             self.processor.plugin_metrics["somemetric"].data)
 
 

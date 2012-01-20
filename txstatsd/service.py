@@ -4,7 +4,7 @@ import socket
 import sys
 import ConfigParser
 
-from twisted.application.internet import UDPServer
+from twisted.application.internet import UDPServer, TCPServer
 from twisted.application.service import MultiService
 from twisted.python import usage
 from twisted.plugin import getPlugins
@@ -13,7 +13,9 @@ from txstatsd.client import InternalClient
 from txstatsd.metrics.metrics import Metrics
 from txstatsd.server.processor import MessageProcessor
 from txstatsd.server.configurableprocessor import ConfigurableMessageProcessor
-from txstatsd.server.protocol import StatsDServerProtocol
+from txstatsd.server.protocol import (
+    StatsDServerProtocol, StatsDTCPServerFactory)
+from txstatsd.server.router import Router
 from txstatsd.report import ReportingService
 from txstatsd.itxstatsd import IMetricFactory
 from twisted.application.service import Service
@@ -143,6 +145,10 @@ class StatsDOptions(OptionsGlue):
          "Response we should send monitoring agent.", str],
         ["statsd-compliance", "s", 1,
          "Produce StatsD-compliant messages.", int],
+        ["routing", "g", "",
+         "Routing rules", str],
+        ["listen-tcp-port", "t", None,
+         "Routing rules", int],
         ["max-queue-size", "Q", 1000,
          "Maximum send queue size per destination.", int],
         ["max-datapoints-per-message", "M", 500,
@@ -178,7 +184,8 @@ class StatsDService(Service):
 
     def flushProcessor(self):
         """Flush messages queued in the processor to Graphite."""
-        for metric, value, timestamp in self.processor.flush(interval=self.flush_interval):
+        for metric, value, timestamp in self.processor.flush(
+                interval=self.flush_interval):
             self.carbon_client.sendDatapoint(metric, (timestamp, value))
 
     def startService(self):
@@ -224,12 +231,14 @@ def createService(options):
 
     if options["statsd-compliance"]:
         processor = MessageProcessor(plugins=plugin_metrics)
-        connection = InternalClient(processor)
+        input_router = Router(processor, options['routing'], root_service)
+        connection = InternalClient(input_router)
         metrics = Metrics(connection, namespace=prefix)
     else:
         processor = ConfigurableMessageProcessor(message_prefix=prefix,
                                                  plugins=plugin_metrics)
-        connection = InternalClient(processor)
+        input_router = Router(processor, options['routing'], root_service)
+        connection = InternalClient(input_router)
         metrics = Metrics(connection)
 
     if not options["carbon-cache-host"]:
@@ -269,15 +278,26 @@ def createService(options):
                                 options["carbon-cache-name"]):
         carbon_client.startClient((host, port, name))
 
-    statsd_service = StatsDService(carbon_client, processor,
+    statsd_service = StatsDService(carbon_client, router,
                                    options["flush-interval"])
     statsd_service.setServiceParent(root_service)
 
     statsd_server_protocol = StatsDServerProtocol(
-        processor,
+        input_router,
         monitor_message=options["monitor-message"],
         monitor_response=options["monitor-response"])
+
     listener = UDPServer(options["listen-port"], statsd_server_protocol)
     listener.setServiceParent(root_service)
+
+    if options["listen-tcp-port"] is not None:
+        statsd_tcp_server_factory = StatsDTCPServerFactory(
+                input_router,
+                monitor_message=options["monitor-message"],
+                monitor_response=options["monitor-response"])
+
+        listener = TCPServer(options["listen-tcp-port"],
+            statsd_tcp_server_factory)
+        listener.setServiceParent(root_service)
 
     return root_service
