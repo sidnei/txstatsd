@@ -137,6 +137,8 @@ class StatsDOptions(OptionsGlue):
          "The number of milliseconds between each flush.", int],
         ["prefix", "x", None,
          "Prefix to use when reporting stats.", str],
+        ["instance-name", "N", None,
+         "Instance name for our own stats reporting.", str],
         ["report", "r", None,
          "Which additional stats to report {process|net|io|system}.", str],
         ["monitor-message", "m", "txstatsd ping",
@@ -221,7 +223,7 @@ def createService(options):
 
     prefix = options["prefix"]
     if prefix is None:
-        prefix = socket.gethostname() + ".statsd"
+        prefix = "statsd"
 
     # initialize plugins
     plugin_metrics = []
@@ -248,7 +250,11 @@ def createService(options):
     if not options["carbon-cache-name"]:
         options["carbon-cache-name"].append(None)
 
-    reporting = ReportingService()
+    instance_name = options["instance-name"]
+    if not instance_name:
+        instance_name = socket.gethostname().replace('.','_')
+
+    reporting = ReportingService(instance_name)
     reporting.setServiceParent(root_service)
 
     # Schedule updates for those metrics expecting to be
