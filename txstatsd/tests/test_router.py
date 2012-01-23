@@ -38,7 +38,6 @@ class RouteMessagesTest(TestCase):
         self.assertEqual(len(processor.counter_metrics), 1)
 
     def test_receive_counter(self):
-
         self.router.process("gorets:1|c")
         self.assertEqual(len(self.processor.messages), 1)
 
@@ -64,7 +63,7 @@ class RouteMessagesTest(TestCase):
 
     def test_not(self):
         """
-        Any message gets dropped with the drop rule.
+        Messages not matching the path_like expression get dropped.
         """
         self.update_rules("not path_like goret* => drop")
         self.router.process("gorets:1|c")
@@ -74,7 +73,7 @@ class RouteMessagesTest(TestCase):
 
     def test_rewrite(self):
         """
-        Any message gets dropped with the drop rule.
+        Process all messages but only rewrite matching ones.
         """
         self.update_rules(r"any => rewrite (gorets) glork.\1")
         self.router.process("gorets:1|c")

@@ -284,6 +284,6 @@ class Router(BaseMessageProcessor):
 
             message = self.rebuild_message(metric_type, key, fields)
             self.message_processor.process_message(message, metric_type,
-                                                     key, fields)
+                                                   key, fields)
         except StopProcessingException:
             pass
