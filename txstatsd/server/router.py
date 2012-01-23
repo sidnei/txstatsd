@@ -32,7 +32,7 @@ from zope.interface import implements
 
 from twisted.application.internet import UDPServer
 from twisted.application.service import Service
-from twisted.internet import interfaces, reactor
+from twisted.internet import interfaces
 from twisted.internet.protocol import (
     DatagramProtocol, ReconnectingClientFactory, Protocol)
 from twisted.internet import defer
@@ -54,6 +54,8 @@ class TCPRedirectService(Service):
         self.factory = factory
 
     def startService(self):
+        from twisted.internet import reactor
+        
         reactor.connectTCP(self.host, self.port, self.factory)
         return Service.startService(self)
 
@@ -71,6 +73,8 @@ class TCPRedirectClientFactory(ReconnectingClientFactory):
         self.protocol = None
 
     def buildProtocol(self, addr):
+        from twisted.internet import reactor
+
         self.resetDelay()
         self.protocol = TCPRedirectProtocol()
         if self.callback:
