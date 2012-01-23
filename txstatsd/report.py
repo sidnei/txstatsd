@@ -5,12 +5,15 @@ from twisted.python import log
 from functools import wraps
 
 from twisted.application.service import Service
+from twisted.internet import threads
 
 
 class ReportingService(Service):
 
-    def __init__(self):
+    def __init__(self, instance_name="", clock=None):
         self.tasks = []
+        self.clock = clock
+        self.instance_name = instance_name
 
     def schedule(self, function, interval, report_function):
         """
@@ -25,12 +28,18 @@ class ReportingService(Service):
         else:
             call = function
         task = LoopingCall(call)
+        if self.clock is not None:
+            task.clock = self.clock
         self.tasks.append((task, interval))
+        if self.running:
+            task.start(interval, now=True)
 
     def wrapped(self, function, report_function):
         def report_metrics(metrics):
             """For each metric returned, call C{report_function} with it."""
             for name, value in metrics.items():
+                if self.instance_name:
+                    name = self.instance_name + "." + name
                 report_function(name, value)
             return metrics
 
@@ -45,9 +54,11 @@ class ReportingService(Service):
         return wrapper
 
     def startService(self):
+        Service.startService(self)
         for task, interval in self.tasks:
             task.start(interval, now=False)
 
     def stopService(self):
         for task, interval in self.tasks:
             task.stop()
+        Service.stopService(self)
