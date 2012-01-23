@@ -223,7 +223,7 @@ def createService(options):
 
     prefix = options["prefix"]
     if prefix is None:
-        prefix = socket.gethostname() + ".statsd"
+        prefix = "statsd"
 
     # initialize plugins
     plugin_metrics = []
