@@ -284,7 +284,7 @@ def createService(options):
                                 options["carbon-cache-name"]):
         carbon_client.startClient((host, port, name))
 
-    statsd_service = StatsDService(carbon_client, router,
+    statsd_service = StatsDService(carbon_client, input_router,
                                    options["flush-interval"])
     statsd_service.setServiceParent(root_service)
 

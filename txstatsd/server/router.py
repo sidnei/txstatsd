@@ -161,6 +161,7 @@ class Router(BaseMessageProcessor):
         """
         self.rules_config = rules_config
         self.message_processor = message_processor
+        self.flush = message_processor.flush
         self.ready = defer.succeed(None)
         self.service = service
         self.rules = self.build_rules(rules_config)
