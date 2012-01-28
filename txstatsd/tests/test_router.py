@@ -18,6 +18,9 @@ class TestMessageProcessor(object):
     def process_message(self, *args):
         self.messages.append(args)
 
+    def flush(self):
+        pass
+
 
 class RouteMessagesTest(TestCase):
 
