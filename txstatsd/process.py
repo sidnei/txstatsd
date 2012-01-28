@@ -4,8 +4,6 @@ import psutil
 
 from functools import update_wrapper
 
-from twisted.internet import defer, fdesc, error
-
 
 MEMINFO_KEYS = ("MemTotal:", "MemFree:", "Buffers:",
                 "Cached:", "SwapCached:", "SwapTotal:",
@@ -15,27 +13,9 @@ MULTIPLIERS = {"kB": 1024, "mB": 1024 * 1024}
 
 
 def load_file(filename):
-    """Load a file into memory with non blocking reads."""
-    fd = os.open(filename, os.O_RDONLY)
-    fdesc.setNonBlocking(fd)
-
-    chunks = []
-    d = defer.Deferred()
-
-    def read_loop(data=None):
-        """Inner loop."""
-        if data is not None:
-            chunks.append(data)
-        r = fdesc.readFromFD(fd, read_loop)
-        if isinstance(r, error.ConnectionDone):
-            os.close(fd)
-            d.callback("".join(chunks))
-        elif r is not None:
-            os.close(fd)
-            d.errback(r)
-
-    read_loop("")
-    return d
+    """Load a file into memory."""
+    with open(filename, "r") as f:
+        return f.read()
 
 
 def parse_meminfo(data, prefix="sys.mem"):
@@ -110,16 +90,20 @@ class ProcessReport(object):
     def get_memory_and_cpu(self, prefix="proc"):
         """Report memory and CPU stats for C{process}."""
         vsize, rss = self.process.get_memory_info()
-        utime, stime = self.process.get_cpu_times()
         result = {prefix + ".cpu.percent": self.process.get_cpu_percent(),
-                  prefix + ".cpu.user": utime,
-                  prefix + ".cpu.system": stime,
                   prefix + ".memory.percent":
                     self.process.get_memory_percent(),
                   prefix + ".memory.vsize": vsize,
                   prefix + ".memory.rss": rss}
         if getattr(self.process, "get_num_threads", None) is not None:
             result[prefix + ".threads"] = self.process.get_num_threads()
+        return result
+
+    def get_cpu_counters(self, prefix="proc"):
+        """Report memory and CPU counters for C{process}."""
+        utime, stime = self.process.get_cpu_times()
+        result = {prefix + ".cpu.user": utime,
+                  prefix + ".cpu.system": stime}
         return result
 
     def get_io_counters(self, prefix="proc.io"):
@@ -150,9 +134,34 @@ class ProcessReport(object):
         return result
 
 
+def report_counters(report_function):
+    """
+    Report difference between last value and current value for wrapped
+    function.
+    """
+    def generate():
+        last_value = None
+        while True:
+            result = {}
+            new_value = report_function()
+            if last_value is None:
+                last_value = new_value
+            else:
+                for key, value in new_value.iteritems():
+                    result[key] = value - last_value[key]
+                last_value = new_value
+            yield result
+    generator = generate()
+    def report():
+        return generator.next()
+    update_wrapper(report, report_function)
+    return report
+
+
 process_report = ProcessReport()
 report_process_memory_and_cpu = process_report.get_memory_and_cpu
-report_process_io_counters = process_report.get_io_counters
+report_process_cpu_counters = report_counters(process_report.get_cpu_counters)
+report_process_io_counters = report_counters(process_report.get_io_counters)
 report_process_net_stats = process_report.get_net_stats
 
 
@@ -188,14 +197,14 @@ def report_reactor_stats(reactor, prefix="reactor"):
 def report_file_stats(filename, parser):
     """Read statistics from a file and report them."""
     def report():
-        deferred = load_file(filename)
-        deferred.addCallback(parser)
-        return deferred
+        return parser(load_file(filename))
     update_wrapper(report, report_file_stats)
     return report
 
 
 PROCESS_STATS = (report_process_memory_and_cpu,)
+
+COUNTER_STATS = (report_process_cpu_counters,)
 
 IO_STATS = (report_process_io_counters,)
 
@@ -203,5 +212,6 @@ NET_STATS = (report_process_net_stats,)
 
 SYSTEM_STATS = (report_file_stats("/proc/meminfo", parse_meminfo),
                 report_file_stats("/proc/loadavg", parse_loadavg),
-                report_file_stats("/proc/net/dev", parse_netdev),
-                report_system_stats)
+                report_counters(report_file_stats("/proc/net/dev", parse_netdev)),
+                report_counters(report_system_stats),
+                )

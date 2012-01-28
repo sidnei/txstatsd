@@ -3,12 +3,11 @@ import psutil
 import sys
 
 from mocker import MockerTestCase
-from twisted.internet import defer
 from twisted.trial.unittest import TestCase
 
 from txstatsd.process import (
     ProcessReport, load_file, parse_meminfo, parse_loadavg, parse_netdev,
-    report_system_stats, report_reactor_stats, report_threadpool_stats)
+    report_system_stats, report_reactor_stats, report_threadpool_stats, report_counters)
 
 
 meminfo = """\
@@ -65,18 +64,6 @@ tun0: 5138313   24837    0    0    0     0          0         0  5226635   26986
 class TestSystemPerformance(TestCase, MockerTestCase):
     """Test system performance monitoring."""
 
-    def assertSuccess(self, deferred, result=None):
-        """
-        Assert that the given C{deferred} results in the given C{result}.
-        """
-        self.assertTrue(isinstance(deferred, defer.Deferred))
-        return deferred.addCallback(self.assertEqual, result)
-
-    def test_read(self):
-        """We can read files non blocking."""
-        d = load_file(__file__)
-        return self.assertSuccess(d, open(__file__).read())
-
     def test_loadinfo(self):
         """We understand loadinfo."""
         loadinfo = "1.02 1.08 1.14 2/2015 19420"
@@ -91,8 +78,8 @@ class TestSystemPerformance(TestCase, MockerTestCase):
         self.assertEqual(r['sys.mem.Buffers'], 8052 * 1024)
         self.assert_('sys.mem.HugePages_Rsvd' not in r)
 
-    def test_statinfo(self):
-        """System stat info is collected through psutil."""
+    def test_cpu_counters(self):
+        """System cpu counters are collected through psutil."""
         cpu_times = psutil.cpu_times()
         mock = self.mocker.replace("psutil.cpu_times")
         self.expect(mock()).result(cpu_times)
@@ -121,39 +108,50 @@ class TestSystemPerformance(TestCase, MockerTestCase):
             self.assertEqual(cpu_times.idle, result["sys.cpu.idle"])
             self.assertEqual(cpu_times.irq, result["sys.cpu.irq"])
 
-    def test_self_statinfo(self):
+    def test_self_cpu_and_memory_stats(self):
         """
-        Process stat info is collected through psutil.
+        Process cpu and memory stats are collected through psutil.
 
         If the L{Process} implementation does not have C{get_num_threads} then
         the number of threads will not be included in the output.
         """
         process = psutil.Process(os.getpid())
         vsize, rss = process.get_memory_info()
-        utime, stime = process.get_cpu_times()
         cpu_percent = process.get_cpu_percent()
         memory_percent = process.get_memory_percent()
 
         mock = self.mocker.mock()
         self.expect(mock.get_memory_info()).result((vsize, rss))
-        self.expect(mock.get_cpu_times()).result((utime, stime))
         self.expect(mock.get_cpu_percent()).result(cpu_percent)
         self.expect(mock.get_memory_percent()).result(memory_percent)
         self.expect(mock.get_num_threads).result(None)
         self.mocker.replay()
 
         result = ProcessReport(process=mock).get_memory_and_cpu()
-        self.assertEqual(utime, result["proc.cpu.user"])
-        self.assertEqual(stime, result["proc.cpu.system"])
         self.assertEqual(cpu_percent, result["proc.cpu.percent"])
         self.assertEqual(vsize, result["proc.memory.vsize"])
         self.assertEqual(rss, result["proc.memory.rss"])
         self.assertEqual(memory_percent, result["proc.memory.percent"])
         self.failIf("proc.threads" in result)
 
-    def test_self_statinfo_with_num_threads(self):
+    def test_self_cpu_counters(self):
         """
-        Process stat info is collected through psutil.
+        Process cpu counters are collected through psutil.
+        """
+        process = psutil.Process(os.getpid())
+        utime, stime = process.get_cpu_times()
+
+        mock = self.mocker.mock()
+        self.expect(mock.get_cpu_times()).result((utime, stime))
+        self.mocker.replay()
+
+        result = ProcessReport(process=mock).get_cpu_counters()
+        self.assertEqual(utime, result["proc.cpu.user"])
+        self.assertEqual(stime, result["proc.cpu.system"])
+
+    def test_self_cpu_and_memory_stats_with_num_threads(self):
+        """
+        Process cpu and memory stats are collected through psutil.
 
         If the L{Process} implementation contains C{get_num_threads} then the
         number of threads will be included in the output.
@@ -161,21 +159,17 @@ class TestSystemPerformance(TestCase, MockerTestCase):
         """
         process = psutil.Process(os.getpid())
         vsize, rss = process.get_memory_info()
-        utime, stime = process.get_cpu_times()
         cpu_percent = process.get_cpu_percent()
         memory_percent = process.get_memory_percent()
 
         mock = self.mocker.mock()
         self.expect(mock.get_memory_info()).result((vsize, rss))
-        self.expect(mock.get_cpu_times()).result((utime, stime))
         self.expect(mock.get_cpu_percent()).result(cpu_percent)
         self.expect(mock.get_memory_percent()).result(memory_percent)
         self.expect(mock.get_num_threads()).result(1)
         self.mocker.replay()
 
         result = ProcessReport(process=mock).get_memory_and_cpu()
-        self.assertEqual(utime, result["proc.cpu.user"])
-        self.assertEqual(stime, result["proc.cpu.system"])
         self.assertEqual(cpu_percent, result["proc.cpu.percent"])
         self.assertEqual(vsize, result["proc.memory.vsize"])
         self.assertEqual(rss, result["proc.memory.rss"])
@@ -304,3 +298,25 @@ class TestSystemPerformance(TestCase, MockerTestCase):
             "sys.net.tun0.bytes.sent": 5226635,
             "sys.net.tun0.packets.received": 24837,
             "sys.net.tun0.packets.sent": 26986})
+
+    def test_report_counters(self):
+        """
+        C{report_counters} keeps the last value of a called function and on the
+        next call returns the difference between current return value and
+        previous return value.
+        """
+        def generate():
+            yield {"foo": 1}
+            yield {"foo": 5}
+            yield {"foo": 10}
+            yield {"foo": 17}
+        generate = generate()
+        def reporter():
+            return generate.next()
+        wrapped = report_counters(reporter)
+        self.assertEqual({}, wrapped())
+        self.assertEqual({"foo": 4}, wrapped())
+        self.assertEqual({"foo": 5}, wrapped())
+        self.assertEqual({"foo": 7}, wrapped())
+        
+
