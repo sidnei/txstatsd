@@ -202,10 +202,10 @@ def report_client_manager_stats():
     from carbon.instrumentation import stats
 
     current_stats = stats.copy()
-    stats.clear()
     for name in list(current_stats.keys()):
         if not name.startswith("destinations"):
             del current_stats[name]
+        stats[name] = 0
     return current_stats
 
 

@@ -171,7 +171,10 @@ class ClientManagerStatsTestCase(TestCase):
         self.assertEquals({"destinations.bahamas": 2,
                            "destinations.hawaii": 3},
                           service.report_client_manager_stats())
-        self.assertEquals({}, stats)
+        self.assertEquals({"foo": 0,
+                           "bar": 0,
+                           "destinations.bahamas": 0,
+                           "destinations.hawaii": 0}, stats)
 
 
 class Agent(DatagramProtocol):
