@@ -11,6 +11,7 @@ from twisted.plugin import getPlugins
 
 from txstatsd.client import InternalClient
 from txstatsd.metrics.metrics import Metrics
+from txstatsd.metrics.extendedmetrics import ExtendedMetrics
 from txstatsd.server.processor import MessageProcessor
 from txstatsd.server.configurableprocessor import ConfigurableMessageProcessor
 from txstatsd.server.protocol import (
@@ -235,13 +236,13 @@ def createService(options):
         processor = MessageProcessor(plugins=plugin_metrics)
         input_router = Router(processor, options['routing'], root_service)
         connection = InternalClient(input_router)
-        metrics = Metrics(connection, namespace=prefix)
+        metrics = Metrics(connection)
     else:
         processor = ConfigurableMessageProcessor(message_prefix=prefix,
                                                  plugins=plugin_metrics)
         input_router = Router(processor, options['routing'], root_service)
         connection = InternalClient(input_router)
-        metrics = Metrics(connection)
+        metrics = ExtendedMetrics(connection)
 
     if not options["carbon-cache-host"]:
         options["carbon-cache-host"].append("127.0.0.1")
@@ -259,20 +260,23 @@ def createService(options):
 
     # Schedule updates for those metrics expecting to be
     # periodically updated, for example the meter metric.
-    reporting.schedule(processor.update_metrics, 5, None)
-    reporting.schedule(report_client_manager_stats, 10, metrics.gauge)
+    reporting.schedule(processor.update_metrics, 10, None)
+    reporting.schedule(report_client_manager_stats,
+                       options["flush-interval"] / 1000,
+                       metrics.gauge)
 
     if options["report"] is not None:
         from txstatsd import process
         from twisted.internet import reactor
 
         reporting.schedule(
-            process.report_reactor_stats(reactor), 10, metrics.gauge)
+            process.report_reactor_stats(reactor), 60, metrics.gauge)
         reports = [name.strip() for name in options["report"].split(",")]
         for report_name in reports:
             for reporter in getattr(process, "%s_STATS" %
                                     report_name.upper(), ()):
-                reporting.schedule(reporter, 10, metrics.gauge)
+                reporting.schedule(reporter, 60, metrics.gauge)
+
 
     # XXX Make this configurable.
     router = ConsistentHashingRouter()
