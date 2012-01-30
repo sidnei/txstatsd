@@ -153,9 +153,9 @@ class StatsDOptions(OptionsGlue):
          "Routing rules", str],
         ["listen-tcp-port", "t", None,
          "The TCP port where we will listen.", int],
-        ["max-queue-size", "Q", 1000,
+        ["max-queue-size", "Q", 20000,
          "Maximum send queue size per destination.", int],
-        ["max-datapoints-per-message", "M", 500,
+        ["max-datapoints-per-message", "M", 1000,
          "Maximum datapoints per message to carbon-cache.", int],
         ]
 
