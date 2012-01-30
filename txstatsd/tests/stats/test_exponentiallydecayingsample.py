@@ -65,3 +65,5 @@ class TestExponentiallyDecayingSample(TestCase):
         self.assertEqual(sample.size(), 100)
         self.assertEqual(len(sample.get_values()), 100,
                          'Should have 100 elements')
+    test_ewma_sample_load.skip = "takes too long to run"
+

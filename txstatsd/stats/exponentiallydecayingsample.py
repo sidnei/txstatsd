@@ -19,8 +19,8 @@ class ExponentiallyDecayingSample(object):
       library/publications/CormodeShkapenyukSrivastavaXu09.pdf>}
     """
 
-    # 1 hour (in seconds)
-    RESCALE_THRESHOLD = 60 * 60
+    # 10 minutes (in seconds)
+    RESCALE_THRESHOLD = 60 * 10
 
     def __init__(self, reservoir_size, alpha, wall_time=None):
         """Creates a new C{ExponentiallyDecayingSample}.
