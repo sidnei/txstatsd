@@ -1,4 +1,4 @@
-
+import bisect
 import math
 import random
 import time
@@ -19,10 +19,10 @@ class ExponentiallyDecayingSample(object):
       library/publications/CormodeShkapenyukSrivastavaXu09.pdf>}
     """
 
-    # 1 hour (in seconds)
-    RESCALE_THRESHOLD = 60 * 60
+    # 10 minutes (in seconds)
+    RESCALE_THRESHOLD = 60 * 10
 
-    def __init__(self, reservoir_size, alpha):
+    def __init__(self, reservoir_size, alpha, wall_time=None):
         """Creates a new C{ExponentiallyDecayingSample}.
 
         @param reservoir_size: The number of samples to keep in the sampling
@@ -30,7 +30,7 @@ class ExponentiallyDecayingSample(object):
         @parama alpha: The exponential decay factor; the higher this is,
             the more biased the sample will be towards newer values.
         """
-        self._values = dict()
+        self._values = []
         self.alpha = alpha
         self.reservoir_size = reservoir_size
 
@@ -38,14 +38,17 @@ class ExponentiallyDecayingSample(object):
         self.start_time = 0
         self.next_scale_time = 0
 
+        if wall_time is None:
+            wall_time = time.time
+        self._wall_time = wall_time
         self.clear()
 
     def clear(self):
-        self._values.clear()
+        self._values = []
         self.count = 0
         self.start_time = self.tick()
         self.next_scale_time = (
-            time.time() + ExponentiallyDecayingSample.RESCALE_THRESHOLD)
+            self._wall_time() + self.RESCALE_THRESHOLD)
 
     def size(self):
         return min(self.reservoir_size, self.count)
@@ -64,27 +67,24 @@ class ExponentiallyDecayingSample(object):
         self.count += 1
         new_count = self.count
         if new_count <= self.reservoir_size:
-            self._values[priority] = value
+            bisect.insort(self._values, (priority, value))
         else:
-            keys = sorted(self._values.keys())
-            first = keys[0]
+            first = self._values[0][0]
 
             if first < priority:
-                if priority not in self._values:
-                    self._values[priority] = value
-                    del self._values[first]
+                bisect.insort(self._values, (priority, value))
+                self._values = self._values[1:]
 
-        now = time.time()
+        now = self._wall_time()
         next = self.next_scale_time
         if now >= next:
             self.rescale(now, next)
 
     def get_values(self):
-        keys = sorted(self._values.keys())
-        return [self._values[k] for k in keys]
+        return [v for (k, v) in self._values]
 
     def tick(self):
-        return time.time()
+        return self._wall_time()
 
     def weight(self, t):
         return math.exp(self.alpha * t)
@@ -113,12 +113,12 @@ class ExponentiallyDecayingSample(object):
         """
 
         self.next_scale_time = (
-            now + ExponentiallyDecayingSample.RESCALE_THRESHOLD)
+            now + self.RESCALE_THRESHOLD)
         old_start_time = self.start_time
         self.start_time = self.tick()
-        keys = sorted(self._values.keys())
-        for k in keys:
-            v = self._values[k]
-            del self._values[k]
-            self._values[k * math.exp(-self.alpha *
-                         (self.start_time - old_start_time))] = v
+
+        new_values = []
+        for k, v in self._values:
+            nk = k * math.exp(-self.alpha * (self.start_time - old_start_time))
+            new_values.append((nk, v))
+        self._values = new_values
