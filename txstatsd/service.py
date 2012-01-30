@@ -1,12 +1,13 @@
 
 import getopt
-import socket
 import sys
+import time
 import ConfigParser
+import platform
 
 from twisted.application.internet import UDPServer, TCPServer
 from twisted.application.service import MultiService
-from twisted.python import usage
+from twisted.python import usage, log
 from twisted.plugin import getPlugins
 
 from txstatsd.client import InternalClient
@@ -187,9 +188,13 @@ class StatsDService(Service):
 
     def flushProcessor(self):
         """Flush messages queued in the processor to Graphite."""
+        flushed = 0
+        start = time.time()
         for metric, value, timestamp in self.processor.flush(
                 interval=self.flush_interval):
             self.carbon_client.sendDatapoint(metric, (timestamp, value))
+            flushed += 1
+        log.msg("Flushed total %d metrics in %.6f" % (flushed, time.time() - start))
 
     def startService(self):
         self.flush_task.start(self.flush_interval / 1000, False)
@@ -226,6 +231,10 @@ def createService(options):
     if prefix is None:
         prefix = "statsd"
 
+    instance_name = options["instance-name"]
+    if not instance_name:
+        instance_name = platform.node()
+
     # initialize plugins
     plugin_metrics = []
     for plugin in getPlugins(IMetricFactory):
@@ -238,8 +247,10 @@ def createService(options):
         connection = InternalClient(input_router)
         metrics = Metrics(connection)
     else:
-        processor = ConfigurableMessageProcessor(message_prefix=prefix,
-                                                 plugins=plugin_metrics)
+        processor = ConfigurableMessageProcessor(
+            message_prefix=prefix,
+            internal_metrics_prefix=prefix + "." + instance_name + ".",
+            plugins=plugin_metrics)
         input_router = Router(processor, options['routing'], root_service)
         connection = InternalClient(input_router)
         metrics = ExtendedMetrics(connection)
@@ -250,10 +261,6 @@ def createService(options):
         options["carbon-cache-port"].append(2004)
     if not options["carbon-cache-name"]:
         options["carbon-cache-name"].append(None)
-
-    instance_name = options["instance-name"]
-    if not instance_name:
-        instance_name = socket.gethostname().replace('.','_')
 
     reporting = ReportingService(instance_name)
     reporting.setServiceParent(root_service)
@@ -276,7 +283,6 @@ def createService(options):
             for reporter in getattr(process, "%s_STATS" %
                                     report_name.upper(), ()):
                 reporting.schedule(reporter, 60, metrics.gauge)
-
 
     # XXX Make this configurable.
     router = ConsistentHashingRouter()
