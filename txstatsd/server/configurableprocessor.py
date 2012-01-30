@@ -23,19 +23,16 @@ class ConfigurableMessageProcessor(MessageProcessor):
       duration statistics, plus throughput statistics.
     """
 
-    METRICS_SUMMARY = "statsd.numStats"
-
-    def __init__(self, time_function=time.time, message_prefix="", plugins=None):
+    def __init__(self, time_function=time.time, message_prefix="",
+                 internal_metrics_prefix="", plugins=None):
         super(ConfigurableMessageProcessor, self).__init__(
             time_function=time_function, plugins=plugins)
 
-        if message_prefix:
-            self.metrics_summary = (
-                message_prefix + "." + 
-                ConfigurableMessageProcessor.METRICS_SUMMARY)
-        else:
-            self.metrics_summary = ConfigurableMessageProcessor.METRICS_SUMMARY
-
+        if not internal_metrics_prefix and not message_prefix:
+            internal_metrics_prefix = "statsd."
+        elif message_prefix and not internal_metrics_prefix:
+            internal_metrics_prefix = message_prefix + "." + "statsd."
+        self.internal_metrics_prefix = internal_metrics_prefix
         self.message_prefix = message_prefix
         self.gauge_metrics = {}
 
@@ -111,9 +108,6 @@ class ConfigurableMessageProcessor(MessageProcessor):
             events += 1
 
         return (metrics, events)
-
-    def flush_metrics_summary(self, messages, num_stats, timestamp):
-        messages.append((self.metrics_summary, num_stats, timestamp))
 
     def update_metrics(self):
         super(ConfigurableMessageProcessor, self).update_metrics()

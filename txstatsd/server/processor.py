@@ -66,11 +66,13 @@ class MessageProcessor(BaseMessageProcessor):
         self.time_function = time_function
 
         self.stats_prefix = "stats."
-        self.metrics_summary = "statsd.numStats"
+        self.internal_metrics_prefix = "statsd."
         self.count_prefix = "stats_counts."
         self.timer_prefix = self.stats_prefix + "timers."
         self.gauge_prefix = self.stats_prefix + "gauge."
 
+        self.process_timings = {}
+        self.by_type = {}
         self.timer_metrics = {}
         self.counter_metrics = {}
         self.gauge_metrics = deque()
@@ -89,6 +91,7 @@ class MessageProcessor(BaseMessageProcessor):
         Process a single entry, adding it to either C{counters}, C{timers},
         or C{gauge_metrics} depending on which kind of message it is.
         """
+        start = self.time_function()
         if metric_type == "c":
             self.process_counter_metric(key, fields, message)
         elif metric_type == "ms":
@@ -101,6 +104,10 @@ class MessageProcessor(BaseMessageProcessor):
             self.process_plugin_metric(metric_type, key, fields, message)
         else:
             return self.fail(message)
+        self.process_timings.setdefault(metric_type, 0)
+        self.process_timings[metric_type] += self.time_function() - start
+        self.by_type.setdefault(metric_type, 0)
+        self.by_type[metric_type] += 1
 
     def get_message_prefix(self, kind):
         return "stats." + kind
@@ -187,37 +194,53 @@ class MessageProcessor(BaseMessageProcessor):
         C{interval} and mean timings based on C{threshold}.
         """
         messages = []
+        per_metric = {}
         num_stats = 0
         interval = interval / 1000
         timestamp = int(self.time_function())
 
+        start = self.time_function()
         counter_metrics, events = self.flush_counter_metrics(interval,
                                                              timestamp)
+        duration = self.time_function() - start
         if events > 0:
             messages.extend(sorted(counter_metrics))
             num_stats += events
+        per_metric["counter"] = (events, duration)
 
+        start = self.time_function()
         timer_metrics, events = self.flush_timer_metrics(percent, timestamp)
+        duration = self.time_function() - start
         if events > 0:
             messages.extend(sorted(timer_metrics))
             num_stats += events
+        per_metric["timer"] = (events, duration)
 
+        start = self.time_function()
         gauge_metrics, events = self.flush_gauge_metrics(timestamp)
+        duration = self.time_function() - start
         if events > 0:
             messages.extend(sorted(gauge_metrics))
             num_stats += events
+        per_metric["gauge"] = (events, duration)
 
+        start = self.time_function()
         meter_metrics, events = self.flush_meter_metrics(timestamp)
+        duration = self.time_function() - start
         if events > 0:
             messages.extend(sorted(meter_metrics))
             num_stats += events
+        per_metric["meter"] = (events, duration)
 
+        start = self.time_function()
         plugin_metrics, events = self.flush_plugin_metrics(interval, timestamp)
+        duration = self.time_function() - start
         if events > 0:
             messages.extend(sorted(plugin_metrics))
             num_stats += events
+        per_metric["plugin"] = (events, duration)
 
-        self.flush_metrics_summary(messages, num_stats, timestamp)
+        self.flush_metrics_summary(messages, num_stats, per_metric, timestamp)
         return messages
 
     def flush_counter_metrics(self, interval, timestamp):
@@ -305,8 +328,33 @@ class MessageProcessor(BaseMessageProcessor):
 
         return (metrics, events)
 
-    def flush_metrics_summary(self, messages, num_stats, timestamp):
-        messages.append((self.metrics_summary, num_stats, timestamp))
+    def flush_metrics_summary(self, messages, num_stats,
+                              per_metric, timestamp):
+        messages.append((self.internal_metrics_prefix + "numStats",
+                         num_stats, timestamp))
+        for name, (value, duration) in per_metric.iteritems():
+            messages.extend([
+                (self.internal_metrics_prefix +
+                 "flush.%s.count" % name,
+                 value, timestamp),
+                (self.internal_metrics_prefix +
+                 "flush.%s.duration" % name,
+                 duration * 1000, timestamp)])
+            log.msg("Flushed %d %s metrics in %.6f" %
+                    (value, name, duration))
+        for metric_type, duration in self.process_timings.iteritems():
+            messages.extend([
+                (self.internal_metrics_prefix +
+                 "receive.%s.count" %
+                 metric_type, self.by_type[metric_type], timestamp),
+                (self.internal_metrics_prefix +
+                 "receive.%s.duration" %
+                 metric_type, duration * 1000, timestamp)
+                ])
+            log.msg("Processing %d %s metrics took %.6f" %
+                    (self.by_type[metric_type], metric_type, duration))
+        self.process_timings.clear()
+        self.by_type.clear()
 
     def update_metrics(self):
         for metric in self.meter_metrics.itervalues():
