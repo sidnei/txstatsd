@@ -22,6 +22,7 @@ Targets supported:
     redirect_udp host port: will send to (host, port) by udp
     redirect_tcp host port: will send to (host, port) by tcp
     rewrite pattern repl: will rewrite the path like re.sub
+    set_metric_type metric_type: will make the metric of type metric_type
 
 """
 import fnmatch
@@ -55,7 +56,7 @@ class TCPRedirectService(Service):
 
     def startService(self):
         from twisted.internet import reactor
-        
+
         reactor.connectTCP(self.host, self.port, self.factory)
         return Service.startService(self)
 
@@ -240,6 +241,11 @@ class Router(BaseMessageProcessor):
             return (metric_type, key, fields)
 
         return rewrite_target
+
+    def build_target_set_metric_type(self, metric_type):
+        def set_metric_type(_, key, fields):
+            return metric_type, key, fields
+        return set_metric_type
 
     def build_target_redirect_udp(self, host, port):
         if self.service is None:

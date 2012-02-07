@@ -85,6 +85,15 @@ class RouteMessagesTest(TestCase):
         self.assertEqual(self.processor.messages[0][2], "glork.gorets")
         self.assertEqual(self.processor.messages[1][2], "nomatch")
 
+    def test_set_metric_type(self):
+        """
+        Set metric type to something else.
+        """
+        self.update_rules(r"any => set_metric_type d")
+        self.router.process("gorets:1|c")
+        self.assertEqual(self.processor.messages[0][1], "d")
+        self.assertEqual(self.processor.messages[0][2], "gorets")
+
 
 class TestUDPRedirect(TxTestCase):
 
