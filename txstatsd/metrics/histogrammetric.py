@@ -1,3 +1,4 @@
+# -*- coding: utf-8 *-*
 import math
 
 from txstatsd.stats.exponentiallydecayingsample \
@@ -120,7 +121,7 @@ class HistogramMetricReporter(object):
         @param percentiles one or more percentiles
         """
 
-        scores = [0.0 for i in range(len(percentiles))]
+        scores = [0.0] * len(percentiles)
         if self.count > 0:
             values = self.sample.get_values()
             values.sort()
@@ -138,6 +139,32 @@ class HistogramMetricReporter(object):
                     scores[i] = lower + (pos - math.floor(pos)) * (
                         upper - lower)
 
+        return scores
+
+    def histogram(self):
+        """Returns an histogram of the sample.
+        """
+
+        # If we dont have data, build an empty histogram.
+        if not self.count > 0:
+            return [0.0] * 10
+
+        # Sturges Rule for selecting the number of bins
+        # Sturges, H. A. (1926) The choice of a class interval.
+        # Journal of the American Statistical Association 21, 65–66.
+        n_bins = int(math.ceil(1 + math.log(self.count, 2)))
+
+        scores = [0.0] * n_bins
+
+        values = self.sample.get_values()
+        max_value = float(max(values))
+
+        for value in values:
+            pos = int((value / max_value) * n_bins)
+            if pos == n_bins:
+                pos -= 1
+
+            scores[pos] += 1
         return scores
 
     def get_values(self):

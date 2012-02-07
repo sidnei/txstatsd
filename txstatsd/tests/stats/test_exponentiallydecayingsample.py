@@ -1,6 +1,6 @@
 import random
 
-from unittest import TestCase
+from twisted.trial.unittest import TestCase
 
 from txstatsd.stats.exponentiallydecayingsample import (
     ExponentiallyDecayingSample)

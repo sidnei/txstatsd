@@ -73,11 +73,13 @@ class MessageProcessor(BaseMessageProcessor):
 
         self.process_timings = {}
         self.by_type = {}
+        self.last_flush_duration = 0
+        self.last_process_duration = 0
+
         self.timer_metrics = {}
         self.counter_metrics = {}
         self.gauge_metrics = deque()
         self.meter_metrics = {}
-        self.distinct_metrics = {}
 
         self.plugins = {}
         self.plugin_metrics = {}
@@ -330,8 +332,11 @@ class MessageProcessor(BaseMessageProcessor):
 
     def flush_metrics_summary(self, messages, num_stats,
                               per_metric, timestamp):
+
         messages.append((self.internal_metrics_prefix + "numStats",
                          num_stats, timestamp))
+
+        self.last_flush_duration = 0
         for name, (value, duration) in per_metric.iteritems():
             messages.extend([
                 (self.internal_metrics_prefix +
@@ -342,6 +347,9 @@ class MessageProcessor(BaseMessageProcessor):
                  duration * 1000, timestamp)])
             log.msg("Flushed %d %s metrics in %.6f" %
                     (value, name, duration))
+            self.last_flush_duration += duration
+
+        self.last_process_duration = 0
         for metric_type, duration in self.process_timings.iteritems():
             messages.extend([
                 (self.internal_metrics_prefix +
@@ -353,6 +361,8 @@ class MessageProcessor(BaseMessageProcessor):
                 ])
             log.msg("Processing %d %s metrics took %.6f" %
                     (self.by_type[metric_type], metric_type, duration))
+            self.last_process_duration += duration
+
         self.process_timings.clear()
         self.by_type.clear()
 

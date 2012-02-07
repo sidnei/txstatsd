@@ -195,7 +195,7 @@ class ServiceTestsBuilder(ReactorBuilder):
         o = service.StatsDOptions()
         s = service.createService(o)
         self.assertTrue(isinstance(s, service.MultiService))
-        reporting, manager, statsd, udp = s.services
+        reporting, manager, statsd, udp, httpinfo = s.services
         self.assertTrue(isinstance(reporting, ReportingService))
         self.assertTrue(isinstance(manager, CarbonClientManager))
         self.assertTrue(isinstance(statsd, service.StatsDService))
@@ -281,5 +281,6 @@ class ServiceTestsBuilder(ReactorBuilder):
 
         reactor.callWhenRunning(exercise)
         self.runReactor(reactor)
+
 
 globals().update(ServiceTestsBuilder.makeTestCaseClasses())
