@@ -18,6 +18,7 @@ from txstatsd.server.configurableprocessor import ConfigurableMessageProcessor
 from txstatsd.server.protocol import (
     StatsDServerProtocol, StatsDTCPServerFactory)
 from txstatsd.server.router import Router
+from txstatsd.server import httpinfo
 from txstatsd.report import ReportingService
 from txstatsd.itxstatsd import IMetricFactory
 from twisted.application.service import Service
@@ -157,6 +158,8 @@ class StatsDOptions(OptionsGlue):
          "Maximum send queue size per destination.", int],
         ["max-datapoints-per-message", "M", 1000,
          "Maximum datapoints per message to carbon-cache.", int],
+        ["http-port", "P", None,
+         "The httpinfo port.", int],
         ]
 
     def __init__(self):
@@ -194,7 +197,8 @@ class StatsDService(Service):
                 interval=self.flush_interval):
             self.carbon_client.sendDatapoint(metric, (timestamp, value))
             flushed += 1
-        log.msg("Flushed total %d metrics in %.6f" % (flushed, time.time() - start))
+        log.msg("Flushed total %d metrics in %.6f" %
+                (flushed, time.time() - start))
 
     def startService(self):
         self.flush_task.start(self.flush_interval / 1000, False)
@@ -316,5 +320,8 @@ def createService(options):
         listener = TCPServer(options["listen-tcp-port"],
             statsd_tcp_server_factory)
         listener.setServiceParent(root_service)
+
+    httpinfo_service = httpinfo.makeService(options, processor, statsd_service)
+    httpinfo_service.setServiceParent(root_service)
 
     return root_service

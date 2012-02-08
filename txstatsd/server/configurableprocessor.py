@@ -2,7 +2,6 @@
 import time
 
 from txstatsd.metrics.countermetric import CounterMetricReporter
-from txstatsd.metrics.distinctmetric import DistinctMetricReporter
 from txstatsd.metrics.gaugemetric import GaugeMetricReporter
 from txstatsd.metrics.metermetric import MeterMetricReporter
 from txstatsd.metrics.timermetric import TimerMetricReporter
@@ -38,7 +37,7 @@ class ConfigurableMessageProcessor(MessageProcessor):
 
     def get_message_prefix(self, kind):
         return self.message_prefix
-    
+
     def compose_timer_metric(self, key, duration):
         if not key in self.timer_metrics:
             metric = TimerMetricReporter(key, prefix=self.message_prefix)
@@ -72,13 +71,6 @@ class ConfigurableMessageProcessor(MessageProcessor):
             self.meter_metrics[key] = metric
         self.meter_metrics[key].mark(value)
 
-    def compose_distinct_metric(self, key, item):
-        if not key in self.distinct_metrics:
-            metric = DistinctMetricReporter(key, self.time_function,
-                                         prefix=self.message_prefix)
-            self.distinct_metrics[key] = metric
-        self.distinct_metrics[key].update(item)
-        
     def flush_counter_metrics(self, interval, timestamp):
         metrics = []
         events = 0

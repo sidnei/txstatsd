@@ -74,3 +74,18 @@ class TestHistogramReporterMetric(TestCase):
         values = [i for i in range(1, 10001)]
         self.assertEqual(histogram.get_values(), values,
                          'Should have 10000 values')
+
+    def test_histogram_histogram(self):
+        sample = UniformSample(100000)
+        histogram = HistogramMetricReporter(sample)
+        for i in range(1001, 11001):
+            histogram.update(i)
+
+        hist = histogram.histogram()
+        self.assertEquals(sum(hist), 10000)
+
+        total = sum(hist)
+        binsize = int(total / len(hist))
+        for i in hist:
+            self.assertTrue(abs(i - binsize) <= 1)
+

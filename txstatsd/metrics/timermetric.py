@@ -1,4 +1,7 @@
+import json
 import time
+
+from twisted.web import resource
 
 from txstatsd.metrics.histogrammetric import HistogramMetricReporter
 from txstatsd.metrics.metermetric import MeterMetricReporter
@@ -28,6 +31,21 @@ class TimerMetric(Metric):
     def mark(self, duration):
         """Report this sample performed in duration (measured in seconds)."""
         self.send("%s|ms" % (duration * 1000))
+
+
+class TimerResource(resource.Resource):
+    isLeaf = True
+
+    def __init__(self, reporter):
+        resource.Resource.__init__(self)
+        self.reporter = reporter
+
+    def render_GET(self, request):
+        result = dict(
+            histogram=self.reporter.histogram.histogram(),
+            max_value=self.reporter.max(),
+            min_value=self.reporter.min())
+        return json.dumps(result)
 
 
 class TimerMetricReporter(object):
@@ -91,6 +109,10 @@ class TimerMetricReporter(object):
     def std_dev(self):
         """Returns the standard deviation of all recorded durations."""
         return self.histogram.std_dev()
+
+    def getResource(self):
+        """Return an http resource to represent this."""
+        return TimerResource(self)
 
     def percentiles(self, *percentiles):
         """
