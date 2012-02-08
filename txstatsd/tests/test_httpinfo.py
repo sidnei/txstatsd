@@ -84,7 +84,7 @@ class ServiceTestsBuilder(TestCase):
         except HttpException, e:
             self.assertEquals(e.response.code, 500)
         else:
-            self.fail("Not 404")
+            self.fail("Not 500")
 
     @defer.inlineCallbacks
     def test_httpinfo_timer(self):
