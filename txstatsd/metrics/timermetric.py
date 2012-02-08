@@ -41,7 +41,11 @@ class TimerResource(resource.Resource):
         self.reporter = reporter
 
     def render_GET(self, request):
-        return json.dumps(self.reporter.histogram.histogram())
+        result = dict(
+            histogram=self.reporter.histogram.histogram(),
+            max_value=self.reporter.max(),
+            min_value=self.reporter.min())
+        return json.dumps(result)
 
 
 class TimerMetricReporter(object):

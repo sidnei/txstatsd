@@ -158,9 +158,11 @@ class HistogramMetricReporter(object):
 
         values = self.sample.get_values()
         max_value = float(max(values))
+        min_value = float(min(values))
+        value_range = max_value - min_value
 
         for value in values:
-            pos = int((value / max_value) * n_bins)
+            pos = int(((value - min_value) / value_range) * n_bins)
             if pos == n_bins:
                 pos -= 1
 

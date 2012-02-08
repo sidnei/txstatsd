@@ -75,14 +75,16 @@ class ServiceTestsBuilder(TestCase):
     @defer.inlineCallbacks
     def test_httpinfo_ok(self):
         data = yield self.get_results("status")
-        self.assertTrue(data.startswith("OK\n"),
-            "Expected ok, got: " + data)
+        self.assertEquals(json.loads(data)["status"], "OK")
 
     @defer.inlineCallbacks
     def test_httpinfo_error(self):
-        data = yield self.get_results("status", last_flush_duration=30)
-        self.assertTrue(data.startswith("ERROR\n"),
-            "Expected ERROR, got: " + data)
+        try:
+            data = yield self.get_results("status", last_flush_duration=30)
+        except HttpException, e:
+            self.assertEquals(e.response.code, 500)
+        else:
+            self.fail("Not 404")
 
     @defer.inlineCallbacks
     def test_httpinfo_timer(self):
@@ -100,7 +102,7 @@ class ServiceTestsBuilder(TestCase):
         tmr = TimerMetricReporter('gorets')
         data = yield self.get_results("metrics/gorets",
             timer_metrics={'gorets': tmr})
-        self.assertEquals(json.loads(data), [0.] * 10)
+        self.assertEquals(json.loads(data)["histogram"], [0.] * 10)
 
     @defer.inlineCallbacks
     def test_httpinfo_timer3(self):
@@ -112,8 +114,8 @@ class ServiceTestsBuilder(TestCase):
         data = yield self.get_results("metrics/gorets",
             timer_metrics={'gorets': tmr})
         hist = json.loads(data)
-        self.assertTrue(isinstance(hist, list))
-        self.assertEquals(sum(hist), 1000)
+        self.assertTrue(isinstance(hist, dict))
+        self.assertEquals(sum(hist["histogram"]), 1000)
 
     @defer.inlineCallbacks
     def test_httpinfo_fake_plugin(self):
@@ -123,4 +125,4 @@ class ServiceTestsBuilder(TestCase):
         data = yield self.get_results("metrics/gorets",
             timer_metrics={}, plugin_metrics={'gorets': tmr})
         hist = json.loads(data)
-        self.assertTrue(isinstance(hist, list))
+        self.assertTrue(isinstance(hist, dict))

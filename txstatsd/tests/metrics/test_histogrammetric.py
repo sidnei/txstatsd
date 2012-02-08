@@ -78,7 +78,7 @@ class TestHistogramReporterMetric(TestCase):
     def test_histogram_histogram(self):
         sample = UniformSample(100000)
         histogram = HistogramMetricReporter(sample)
-        for i in range(1, 10001):
+        for i in range(1001, 11001):
             histogram.update(i)
 
         hist = histogram.histogram()

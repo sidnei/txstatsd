@@ -2,7 +2,7 @@
 import json
 
 from twisted.application import service, internet
-from twisted.web import server, resource
+from twisted.web import server, resource, http
 
 
 class Status(resource.Resource):
@@ -20,8 +20,11 @@ class Status(resource.Resource):
                     flush_interval=self.statsd_service.flush_interval)
         if data["flush_interval"] * self.time_high_water < (
                 data["process_time"] + data["flush_time"]):
-            return "ERROR\n" + json.dumps(data)
-        return "OK\n" + json.dumps(data)
+            data["status"] = "ERROR"
+            request.setResponseCode(http.INTERNAL_SERVER_ERROR)
+            return json.dumps(data)
+        data["status"] = "OK"
+        return json.dumps(data)
 
 
 class Metrics(resource.Resource):
