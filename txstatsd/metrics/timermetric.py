@@ -126,12 +126,12 @@ class TimerMetricReporter(object):
                  ".max": self.max(),
                  ".mean": self.mean(),
                  ".stddev": self.std_dev(),
-                 ".median": percentiles[0],
-                 ".75percentile": percentiles[1],
-                 ".95percentile": percentiles[2],
-                 ".98percentile": percentiles[3],
                  ".99percentile": percentiles[4],
-                 ".999percentile": percentiles[5]}
+                 ".999percentile": percentiles[5],
+                 ".count": self.meter.count,
+                 ".1min_rate": self.meter.one_minute_rate(),
+                 ".5min_rate": self.meter.five_minute_rate(),
+                 ".15min_rate": self.meter.fifteen_minute_rate()}
 
         for item, value in items.iteritems():
             metrics.append((self.prefix + self.name + item,

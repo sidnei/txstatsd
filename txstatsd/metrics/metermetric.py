@@ -82,7 +82,7 @@ class MeterMetricReporter(object):
                  ".15min_rate": self.fifteen_minute_rate()}
 
         for item, value in items.iteritems():
-            metrics.append((self.prefix  + self.name + item,
+            metrics.append((self.prefix + self.name + item,
                             round(value, 6), timestamp))
         return metrics
 
