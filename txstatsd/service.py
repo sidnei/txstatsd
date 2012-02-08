@@ -208,9 +208,10 @@ def report_client_manager_stats():
     from carbon.instrumentation import stats
 
     current_stats = stats.copy()
-    for name in list(current_stats.keys()):
-        if not name.startswith("destinations"):
-            del current_stats[name]
+    for name, value in list(current_stats.items()):
+        del current_stats[name]
+        if name.startswith("destinations"):
+            current_stats[name.replace(":", "_")] = value
         stats[name] = 0
     return current_stats
 
