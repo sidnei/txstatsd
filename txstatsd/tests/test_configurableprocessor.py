@@ -46,7 +46,7 @@ class FlushMessagesTest(TestCase):
         self.assertEqual(("test.metric.gorets.count", 17, 42), messages[0])
         self.assertEqual(("statsd.foo.numStats", 1, 42),
                          messages[1])
-        
+
     def test_flush_plugin(self):
         """
         Ensure the prefix features if one is supplied.
@@ -57,7 +57,7 @@ class FlushMessagesTest(TestCase):
         configurable_processor.process("gorets:17|pd")
         messages = configurable_processor.flush()
         self.assertEquals(("test.metric.gorets.count", 1, 42), messages[0])
-        
+
     def test_flush_single_timer_single_time(self):
         """
         If a single timer with a single data point is present, all
@@ -69,14 +69,14 @@ class FlushMessagesTest(TestCase):
         configurable_processor.process("glork:24|ms")
         messages = configurable_processor.flush()
 
-        self.assertEqual(("glork.75percentile", 24.0, 42), messages[0])
-        self.assertEqual(("glork.95percentile", 24.0, 42), messages[1])
-        self.assertEqual(("glork.98percentile", 24.0, 42), messages[2])
+        self.assertEqual(('glork.15min_rate', 0.0, 42), messages[0])
+        self.assertEqual(('glork.1min_rate', 0.0, 42), messages[1])
+        self.assertEqual(('glork.5min_rate', 0.0, 42), messages[2])
         self.assertEqual(("glork.999percentile", 24.0, 42), messages[3])
         self.assertEqual(("glork.99percentile", 24.0, 42), messages[4])
-        self.assertEqual(("glork.max", 24.0, 42), messages[5])
-        self.assertEqual(("glork.mean", 24.0, 42), messages[6])
-        self.assertEqual(("glork.median", 24.0, 42), messages[7])
+        self.assertEqual(("glork.count", 1., 42), messages[5])
+        self.assertEqual(("glork.max", 24.0, 42), messages[6])
+        self.assertEqual(("glork.mean", 24.0, 42), messages[7])
         self.assertEqual(("glork.min", 24.0, 42), messages[8])
         self.assertEqual(("glork.stddev", 0.0, 42), messages[9])
 
@@ -101,14 +101,18 @@ class FlushMessagesTest(TestCase):
         configurable_processor.update_metrics()
 
         messages = configurable_processor.flush()
-        self.assertEqual(("glork.75percentile", 27.75, 42), messages[0])
-        self.assertEqual(("glork.95percentile", 42.0, 42), messages[1])
-        self.assertEqual(("glork.98percentile", 42.0, 42), messages[2])
+
+        self.assertEqual(('glork.15min_rate', 0.20000000000000001, 42),
+            messages[0])
+        self.assertEqual(('glork.1min_rate', 0.20000000000000001, 42),
+            messages[1])
+        self.assertEqual(('glork.5min_rate', 0.20000000000000001, 42),
+            messages[2])
         self.assertEqual(("glork.999percentile", 42.0, 42), messages[3])
         self.assertEqual(("glork.99percentile", 42.0, 42), messages[4])
-        self.assertEqual(("glork.max", 42.0, 42), messages[5])
-        self.assertEqual(("glork.mean", 18.0, 42), messages[6])
-        self.assertEqual(("glork.median", 15.5, 42), messages[7])
+        self.assertEqual(('glork.count', 6.0, 42), messages[5])
+        self.assertEqual(("glork.max", 42.0, 42), messages[6])
+        self.assertEqual(("glork.mean", 18.0, 42), messages[7])
         self.assertEqual(("glork.min", 4.0, 42), messages[8])
         self.assertEqual(("glork.stddev", 13.490738, 42), messages[9])
 
