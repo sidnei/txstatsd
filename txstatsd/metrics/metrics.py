@@ -56,7 +56,7 @@ class Metrics(object):
             self._metrics[name] = gauge_metric
         self._metrics[name].mark(value)
 
-    def meter(self, name, value, sample_rate=1):
+    def meter(self, name, value=1, sample_rate=1):
         """Mark the occurrence of a given number of events."""
         name = self.fully_qualify_name(name)
         if not name in self._metrics:
