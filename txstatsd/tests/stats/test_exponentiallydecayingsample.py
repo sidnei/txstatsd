@@ -67,3 +67,18 @@ class TestExponentiallyDecayingSample(TestCase):
                          'Should have 100 elements')
     test_ewma_sample_load.skip = "takes too long to run"
 
+    def test_ewma_overflow(self):
+        """Long pauses on metric input should not overflow weight."""
+        _time = [10000]
+
+        def wtime():
+            return _time[0]
+
+        sample = ExponentiallyDecayingSample(100, 0.99, wall_time=wtime)
+        for i in xrange(100):
+            sample.update(random.normalvariate(0, 10))
+            _time[0] += 10000
+
+        self.assertEqual(sample.size(), 100)
+        self.assertEqual(len(sample.get_values()), 100,
+                         'Should have 100 elements')
