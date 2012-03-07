@@ -60,6 +60,11 @@ class ExponentiallyDecayingSample(object):
         @param timestamp: The epoch timestamp of *value* in seconds.
         """
 
+        now = self._wall_time()
+        next = self.next_scale_time
+        if now >= next:
+            self.rescale(now, next)
+
         if timestamp is None:
             timestamp = self.tick()
 
@@ -74,11 +79,6 @@ class ExponentiallyDecayingSample(object):
             if first < priority:
                 bisect.insort(self._values, (priority, value))
                 self._values = self._values[1:]
-
-        now = self._wall_time()
-        next = self.next_scale_time
-        if now >= next:
-            self.rescale(now, next)
 
     def get_values(self):
         return [v for (k, v) in self._values]
