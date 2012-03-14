@@ -233,20 +233,20 @@ class Router(BaseMessageProcessor):
             return
         return drop
 
-    def build_target_rewrite(self, pattern, repl, dup=False):
+    def build_target_rewrite(self, pattern, repl, dup="no-dup"):
         rexp = re.compile(pattern)
 
         def rewrite_target(metric_type, key, fields):
-            if dup and rexp.match(key) is not None:
+            if dup == "dup" and rexp.match(key) is not None:
                 yield metric_type, key, fields
             key = rexp.sub(repl, key)
             yield metric_type, key, fields
 
         return rewrite_target
 
-    def build_target_set_metric_type(self, metric_type, dup=False):
+    def build_target_set_metric_type(self, metric_type, dup="no-dup"):
         def set_metric_type(_, key, fields):
-            if dup:
+            if dup == "dup":
                 yield _, key, fields
             yield metric_type, key, fields
         return set_metric_type
