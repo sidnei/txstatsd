@@ -85,11 +85,58 @@ class RouteMessagesTest(TestCase):
         self.assertEqual(self.processor.messages[0][2], "glork.gorets")
         self.assertEqual(self.processor.messages[1][2], "nomatch")
 
+    def test_rewrite_and_dup(self):
+        """
+        Process all messages but only rewrite matching ones. If dup flag is set
+        then duplicate original message without rewriting it.
+        """
+        self.update_rules(r"any => rewrite (gorets) glork.\1 dup")
+        self.router.process("gorets:1|c")
+        self.router.process("nomatch:1|d")
+        self.assertEqual(len(self.processor.messages), 3)
+        self.assertEqual(self.processor.messages[0][2], "gorets")
+        self.assertEqual(self.processor.messages[1][2], "glork.gorets")
+        self.assertEqual(self.processor.messages[2][2], "nomatch")
+
+    def test_rewrite_and_no_dup(self):
+        """
+        Process all messages but only rewrite matching ones. If dup flag is set
+        to no-dup, then the original message is not duplicated.
+        """
+        self.update_rules(r"any => rewrite (gorets) glork.\1 no-dup")
+        self.router.process("gorets:1|c")
+        self.router.process("nomatch:1|d")
+        self.assertEqual(len(self.processor.messages), 2)
+        self.assertEqual(self.processor.messages[0][2], "glork.gorets")
+        self.assertEqual(self.processor.messages[1][2], "nomatch")
+
     def test_set_metric_type(self):
         """
         Set metric type to something else.
         """
         self.update_rules(r"any => set_metric_type d")
+        self.router.process("gorets:1|c")
+        self.assertEqual(self.processor.messages[0][1], "d")
+        self.assertEqual(self.processor.messages[0][2], "gorets")
+
+    def test_set_metric_type_dup(self):
+        """
+        Set metric type to something else. If the dup flag is set, duplicate
+        the original message.
+        """
+        self.update_rules(r"any => set_metric_type d dup")
+        self.router.process("gorets:1|c")
+        self.assertEqual(self.processor.messages[0][1], "c")
+        self.assertEqual(self.processor.messages[0][2], "gorets")
+        self.assertEqual(self.processor.messages[1][1], "d")
+        self.assertEqual(self.processor.messages[1][2], "gorets")
+
+    def test_set_metric_type_no_dup(self):
+        """
+        Set metric type to something else. If the dup flag is set to no-dup
+        then do not duplicate the original message.
+        """
+        self.update_rules(r"any => set_metric_type d no-dup")
         self.router.process("gorets:1|c")
         self.assertEqual(self.processor.messages[0][1], "d")
         self.assertEqual(self.processor.messages[0][2], "gorets")

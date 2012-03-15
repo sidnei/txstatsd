@@ -230,21 +230,25 @@ class Router(BaseMessageProcessor):
     def build_target_drop(self):
         """Returns a target that stops the processing of a message."""
         def drop(*args):
-            raise StopProcessingException()
+            return
         return drop
 
-    def build_target_rewrite(self, pattern, repl):
+    def build_target_rewrite(self, pattern, repl, dup="no-dup"):
         rexp = re.compile(pattern)
 
         def rewrite_target(metric_type, key, fields):
+            if dup == "dup" and rexp.match(key) is not None:
+                yield metric_type, key, fields
             key = rexp.sub(repl, key)
-            return (metric_type, key, fields)
+            yield metric_type, key, fields
 
         return rewrite_target
 
-    def build_target_set_metric_type(self, metric_type):
+    def build_target_set_metric_type(self, metric_type, dup="no-dup"):
         def set_metric_type(_, key, fields):
-            return metric_type, key, fields
+            if dup == "dup":
+                yield _, key, fields
+            yield metric_type, key, fields
         return set_metric_type
 
     def build_target_redirect_udp(self, host, port):
@@ -262,7 +266,7 @@ class Router(BaseMessageProcessor):
         def redirect_udp_target(metric_type, key, fields):
             message = self.rebuild_message(metric_type, key, fields)
             protocol.write(message)
-            return metric_type, key, fields
+            yield metric_type, key, fields
         return redirect_udp_target
 
     def build_target_redirect_tcp(self, host, port):
@@ -280,17 +284,26 @@ class Router(BaseMessageProcessor):
         def redirect_tcp_target(metric_type, key, fields):
             message = self.rebuild_message(metric_type, key, fields)
             factory.write(message)
-            return metric_type, key, fields
+            yield metric_type, key, fields
         return redirect_tcp_target
 
     def process_message(self, message, metric_type, key, fields):
-        try:
+        metrics = [(metric_type, key, fields)]
+        if self.rules:
+            pending, metrics = metrics, []
             for condition, target in self.rules:
-                if condition(metric_type, key, fields):
-                    metric_type, key, fields = target(metric_type, key, fields)
+                if not pending:
+                    return
+                for metric_type, key, fields in pending:
+                    if not condition(metric_type, key, fields):
+                        metrics.append((metric_type, key, fields))
+                        continue
+                    result = target(metric_type, key, fields)
+                    if result is not None:
+                        metrics.extend(result)
+                pending = metrics
 
+        for (metric_type, key, fields) in metrics:
             message = self.rebuild_message(metric_type, key, fields)
             self.message_processor.process_message(message, metric_type,
                                                    key, fields)
-        except StopProcessingException:
-            pass
