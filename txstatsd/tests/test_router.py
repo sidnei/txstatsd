@@ -64,6 +64,14 @@ class RouteMessagesTest(TestCase):
         self.assertEqual(len(self.processor.messages), 1)
         self.assertEqual(self.processor.messages[0][2], "nomatch")
 
+    def test_receive_two_rules_no_match(self):
+        """
+        Messages that do not match more than one rule are processed just fine.
+        """
+        self.update_rules("path_like goret* => drop\npath_like glork* => drop\n")
+        self.router.process("nomatch:1|c")
+        self.assertEqual(len(self.processor.messages), 1)
+
     def test_not(self):
         """
         Messages not matching the path_like expression get dropped.

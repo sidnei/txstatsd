@@ -290,8 +290,8 @@ class Router(BaseMessageProcessor):
     def process_message(self, message, metric_type, key, fields):
         metrics = [(metric_type, key, fields)]
         if self.rules:
-            pending, metrics = metrics, []
             for condition, target in self.rules:
+                pending, metrics = metrics, []
                 if not pending:
                     return
                 for metric_type, key, fields in pending:
@@ -301,7 +301,6 @@ class Router(BaseMessageProcessor):
                     result = target(metric_type, key, fields)
                     if result is not None:
                         metrics.extend(result)
-                pending = metrics
 
         for (metric_type, key, fields) in metrics:
             message = self.rebuild_message(metric_type, key, fields)
