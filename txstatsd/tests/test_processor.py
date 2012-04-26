@@ -42,6 +42,13 @@ class ProcessMessagesTest(TestCase):
             self.processor.rebuild_message("c", "gorets", ["1", "c"]),
             "gorets:1|c")
 
+    def test_metric_names(self):
+        """We return the names of all seen metrics."""
+        kinds = set(["ms", "c", "g", "pd"])
+        for kind in kinds:
+            self.processor.process("%s:1|%s" % (kind, kind))
+        self.assertEquals(kinds, set(self.processor.get_metric_names()))
+
     def test_receive_counter(self):
         """
         A counter message takes the format 'gorets:1|c', where 'gorets' is the

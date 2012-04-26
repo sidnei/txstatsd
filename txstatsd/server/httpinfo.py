@@ -27,6 +27,17 @@ class Status(resource.Resource):
         return json.dumps(data)
 
 
+class ListMetrics(resource.Resource):
+
+    def __init__(self, processor):
+        resource.Resource.__init__(self)
+        self.processor = processor
+
+    def render_GET(self, request):
+        data = dict(names=self.processor.get_metric_names())
+        return json.dumps(data)
+
+
 class Metrics(resource.Resource):
 
     def __init__(self, processor):
@@ -55,6 +66,7 @@ def makeService(options, processor, statsd_service):
     root = resource.Resource()
     root.putChild("status", Status(processor, statsd_service))
     root.putChild("metrics", Metrics(processor))
+    root.putChild("list_metrics", ListMetrics(processor))
     site = server.Site(root)
     s = internet.TCPServer(int(options["http-port"]), site)
     return s

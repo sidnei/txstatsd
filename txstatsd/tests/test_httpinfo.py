@@ -17,6 +17,11 @@ class Dummy:
     last_flush_duration = 3
     last_process_duration = 2
 
+    metric_names = ["one", "two", "three"]
+
+    def get_metric_names(self):
+        return self.metric_names
+
 
 class ResponseCollector(protocol.Protocol):
 
@@ -71,6 +76,11 @@ class ServiceTestsBuilder(TestCase):
     def tearDown(self):
         if self.service is not None:
             self.service.stopService()
+
+    @defer.inlineCallbacks
+    def test_httpinfo_metric_names(self):
+        data = yield self.get_results("list_metrics")
+        self.assertEquals(Dummy.metric_names, json.loads(data)["names"])
 
     @defer.inlineCallbacks
     def test_httpinfo_ok(self):
