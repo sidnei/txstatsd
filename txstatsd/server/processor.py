@@ -88,6 +88,16 @@ class MessageProcessor(BaseMessageProcessor):
             for plugin in plugins:
                 self.plugins[plugin.metric_type] = plugin
 
+    def get_metric_names(self):
+        """Return the names of all seen metrics."""
+        metrics = set()
+        metrics.update(self.timer_metrics.keys())
+        metrics.update(self.counter_metrics.keys())
+        metrics.update(v for k, v in self.gauge_metrics)
+        metrics.update(self.meter_metrics.keys())
+        metrics.update(self.plugin_metrics.keys())
+        return list(metrics)
+
     def process_message(self, message, metric_type, key, fields):
         """
         Process a single entry, adding it to either C{counters}, C{timers},
