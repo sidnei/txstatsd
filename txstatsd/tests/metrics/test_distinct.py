@@ -2,12 +2,11 @@
 # All Rights Reserved
 import random
 
-from scipy.stats import chi2
+import txstatsd.metrics.distinctmetric as distinct
 
 from twisted.trial.unittest import TestCase
 from twisted.plugin import getPlugins
 from twisted.plugins import distinct_plugin
-import txstatsd.metrics.distinctmetric as distinct
 from txstatsd.itxstatsd import IMetricFactory
 
 
@@ -92,3 +91,7 @@ class TestPlugin(TestCase):
         self.assertTrue(distinct_plugin.distinct_metric_factory in \
                         list(getPlugins(IMetricFactory)))
 
+try:
+    from scipy.stats import chi2
+except ImportError:
+    TestHash.test_chi_square.skip = "Missing chi2, skipping"
