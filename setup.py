@@ -3,8 +3,6 @@ from distutils.command.install import install
 from glob import glob
 import os
 
-from twisted.plugin import IPlugin, getPlugins
-
 from txstatsd import version
 
 # If setuptools is present, use it to find_packages(), and also
@@ -39,6 +37,8 @@ class TxPluginInstaller(install):
         # see http://twistedmatrix.com/documents/current/core/howto/plugin.html
         # "when installing or removing software which provides Twisted plugins,
         # the site administrator should be sure the cache is regenerated"
+        from twisted.plugin import IPlugin, getPlugins
+
         list(getPlugins(IPlugin))
 
 setup(
