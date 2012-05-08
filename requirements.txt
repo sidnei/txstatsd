@@ -1,5 +1,6 @@
 Twisted==11.1.0
 carbon==0.9.9
+whisper==0.9.9
 mocker==1.1
 psutil==0.4.1
 wsgiref==0.1.2

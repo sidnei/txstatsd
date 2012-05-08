@@ -4,7 +4,7 @@ import random
 
 import txstatsd.metrics.distinctmetric as distinct
 
-from twisted.trial.unittest import TestCase
+from twisted.trial.unittest import TestCase, SkipTest
 from twisted.plugin import getPlugins
 from twisted.plugins import distinct_plugin
 from txstatsd.itxstatsd import IMetricFactory
@@ -22,6 +22,11 @@ class TestHash(TestCase):
         self.assertEquals(len(results), 256)
 
     def test_chi_square(self):
+        try:
+            from scipy.stats import chi2
+        except ImportError:
+            raise SkipTest("Missing chi2, skipping")
+            
         N = 10000
 
         for (bits, buckets) in [(-1, 1024), (24, 256),
@@ -91,7 +96,3 @@ class TestPlugin(TestCase):
         self.assertTrue(distinct_plugin.distinct_metric_factory in \
                         list(getPlugins(IMetricFactory)))
 
-try:
-    from scipy.stats import chi2
-except ImportError:
-    TestHash.test_chi_square.skip = "Missing chi2, skipping"
