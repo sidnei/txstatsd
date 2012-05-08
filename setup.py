@@ -1,17 +1,18 @@
-from distutils.core import setup
 from distutils.command.install import install
 from glob import glob
 import os
 
 from txstatsd import version
 
-# If setuptools is present, use it to find_packages(), and also
-# declare our dependency on epsilon.
+# If setuptools is present, use it to find_packages()
 extra_setup_args = {}
 try:
     import setuptools
     from setuptools import find_packages
+    from setuptools import setup
 except ImportError:
+    from distutils.core import setup
+
     def find_packages():
         """
         Compatibility wrapper.
