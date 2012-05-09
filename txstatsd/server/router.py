@@ -25,9 +25,9 @@ Targets supported:
     set_metric_type metric_type: will make the metric of type metric_type
 
 """
-import fnmatch
 import re
 import time
+import fnmatch
 
 from zope.interface import implements
 
@@ -35,12 +35,12 @@ from twisted.application.internet import UDPServer
 from twisted.application.service import Service
 from twisted.internet import interfaces
 from twisted.internet.protocol import (
-    DatagramProtocol, ReconnectingClientFactory, Protocol)
+    ReconnectingClientFactory, Protocol)
 from twisted.internet import defer
 from twisted.python import log
 
 from txstatsd.server.processor import BaseMessageProcessor
-
+from txstatsd.client import StatsDClientProtocol, TwistedStatsDClient
 
 class StopProcessingException(Exception):
 
@@ -135,22 +135,6 @@ class TCPRedirectProtocol(Protocol):
             else:
                 line += "\r\n"
         self.transport.write(line)
-
-
-class UDPRedirectProtocol(DatagramProtocol):
-
-    def __init__(self, host, port, callback):
-        self.host = host
-        self.port = port
-        self.callback = callback
-
-    def startProtocol(self):
-        self.transport.connect(self.host, self.port)
-        self.callback()
-
-    def write(self, data):
-        if self.transport is not None:
-            self.transport.write(data)
 
 
 class Router(BaseMessageProcessor):
@@ -258,14 +242,17 @@ class Router(BaseMessageProcessor):
         port = int(port)
         d = defer.Deferred()
         self.ready.addCallback(lambda _: d)
-        protocol = UDPRedirectProtocol(host, port, lambda: d.callback(None))
 
-        client = UDPServer(0, protocol)
-        client.setServiceParent(self.service)
+        client = TwistedStatsDClient(
+            host, port, connect_callback=lambda: d.callback(None))
+        protocol = StatsDClientProtocol(client)
+
+        udp_service = UDPServer(0, protocol)
+        udp_service.setServiceParent(self.service)
 
         def redirect_udp_target(metric_type, key, fields):
             message = self.rebuild_message(metric_type, key, fields)
-            protocol.write(message)
+            client.write(message)
             yield metric_type, key, fields
         return redirect_udp_target
 
