@@ -55,10 +55,9 @@ class ExponentiallyDecayingSample(object):
         @param timestamp: The epoch timestamp of *value* in seconds.
         """
 
+        now = self.tick()
         if timestamp is None:
-            now = timestamp = self.tick()
-        else:
-            now = self.tick()
+            timestamp = now
             
         if now >= self.next_scale_time:
             self.rescale(now, self.next_scale_time)
@@ -99,10 +98,9 @@ class ExponentiallyDecayingSample(object):
         pass over whatever data structure is being used.
         """
 
-        self.next_scale_time = (
-            now + self.RESCALE_THRESHOLD)
+        self.next_scale_time = (now + self.RESCALE_THRESHOLD)
         old_start_time = self.start_time
-        self.start_time = self.tick()
+        self.start_time = now
 
         new_values = []
         for k, v in self._values:
