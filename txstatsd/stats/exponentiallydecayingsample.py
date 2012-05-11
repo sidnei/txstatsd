@@ -55,22 +55,23 @@ class ExponentiallyDecayingSample(object):
         @param timestamp: The epoch timestamp of *value* in seconds.
         """
 
-        now = self.tick()
         if timestamp is None:
-            timestamp = now
+            timestamp = self.tick()
+        now = timestamp
             
         if now >= self.next_scale_time:
             self.rescale(now, self.next_scale_time)
 
         priority = exp(self.alpha * (timestamp - self.start_time)) / random()
+        values = self._values
 
         if self.count < self.reservoir_size:
             self.count += 1
-            insort(self._values, (priority, value))
+            insort(values, (priority, value))
         else:
-            if self._values[0][0] < priority:
-                insort(self._values, (priority, value))
-                self._values.pop(0)
+            if values[0][0] < priority:
+                insort(values, (priority, value))
+                values.pop(0)
             
     def get_values(self):
         return [v for (k, v) in self._values]
