@@ -6,7 +6,7 @@ from mocker import MockerTestCase
 from twisted.trial.unittest import TestCase
 
 from txstatsd.process import (
-    ProcessReport, load_file, parse_meminfo, parse_loadavg, parse_netdev,
+    ProcessReport, parse_meminfo, parse_loadavg, parse_netdev,
     report_system_stats, report_reactor_stats, report_threadpool_stats, report_counters)
 
 

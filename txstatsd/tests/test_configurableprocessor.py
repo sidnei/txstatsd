@@ -6,6 +6,7 @@ from twisted.plugins.distinct_plugin import distinct_metric_factory
 
 from txstatsd.server.configurableprocessor import ConfigurableMessageProcessor
 
+
 class FlushMessagesTest(TestCase):
 
     def test_flush_counter_with_empty_prefix(self):

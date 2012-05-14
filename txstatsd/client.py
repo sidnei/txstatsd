@@ -4,6 +4,8 @@ from twisted.internet.defer import inlineCallbacks, returnValue
 from twisted.internet.protocol import DatagramProtocol
 from twisted.python import log
 
+from txstatsd.hashing import ConsistentHashRing
+
 
 class StatsDClientProtocol(DatagramProtocol):
     """A Twisted-based implementation of the StatsD client protocol.
@@ -49,6 +51,7 @@ class TwistedStatsDClient(object):
             self.host = yield reactor.resolve(host)
             returnValue(self.host)
 
+        self.original_host = host
         self.host = None
         self.resolver = resolve(host)
         if resolver_errback is None:
@@ -61,6 +64,9 @@ class TwistedStatsDClient(object):
         self.disconnect_callback = disconnect_callback
 
         self.transport = None
+
+    def __str__(self):
+        return "%s:%d" % (self.original_host, self.port)
 
     @inlineCallbacks
     def connect(self, transport=None):
@@ -117,7 +123,7 @@ class UdpStatsDClient(object):
         @raise ValueError: If the C{host} and C{port} cannot be
             resolved (for the case where they are not C{None}).
         """
-        self.host = host
+        self.original_host = self.host = host
         self.port = port
 
         if host is not None and port is not None:
@@ -129,6 +135,9 @@ class UdpStatsDClient(object):
                 raise ValueError("The address cannot be resolved.")
 
         self.socket = None
+
+    def __str__(self):
+        return "%s:%d" % (self.original_host, self.port)
 
     def connect(self):
         """Connect to the StatsD server."""
@@ -163,3 +172,15 @@ class InternalClient(object):
     def write(self, data):
         """Write directly to the C{MessageProcessor}."""
         self._processor.process(data)
+
+
+class ConsistentHashingClient(object):
+
+    def __init__(self, clients):
+        self.ring = ConsistentHashRing(clients)
+
+    def write(self, data):
+        """Hash based on the metric name, then send to the right client."""
+        metric_name, rest = data.split(" ", 1)
+        client = self.ring.get_node(metric_name)
+        client.write(data)

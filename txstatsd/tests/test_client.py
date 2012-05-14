@@ -6,7 +6,22 @@ from twisted.python import log
 from twisted.trial.unittest import TestCase
 
 from txstatsd.client import (
-    StatsDClientProtocol, TwistedStatsDClient, UdpStatsDClient)
+    StatsDClientProtocol, TwistedStatsDClient, UdpStatsDClient,
+    ConsistentHashingClient)
+
+
+class FakeClient(object):
+
+    def __init__(self, host, port):
+        self.host = host
+        self.port = port
+        self.data = []
+
+    def __str__(self):
+        return "%s:%d" % (self.host, self.port)
+
+    def write(self, data):
+        self.data.append(data)
 
 
 class TestClient(TestCase):
@@ -91,3 +106,45 @@ class TestClient(TestCase):
         # According to the python docs (and the source, I've checked)
         # setblocking(0) is the same as settimeout(0.0).
         self.assertEqual(client.socket.gettimeout(), 0.0)
+
+
+class TestConsistentHashingClient(TestCase):
+
+    def test_hash_with_single_client(self):
+        clients = [
+            FakeClient("127.0.0.1", 10001),
+            ]
+        client = ConsistentHashingClient(clients)
+        client.write("foo 1 42")
+        client.write("bar 1 42")
+        client.write("pak 1 42")
+        self.assertEqual(clients[0].data, ["foo 1 42",
+                                           "bar 1 42",
+                                           "pak 1 42"])
+
+    def test_hash_with_two_clients(self):
+        clients = [
+            FakeClient("127.0.0.1", 10001),
+            FakeClient("127.0.0.1", 10002),
+            ]
+        client = ConsistentHashingClient(clients)
+        client.write("foo 1 42")
+        client.write("bar 1 42")
+        client.write("pak 1 42")
+        self.assertEqual(clients[0].data, ["foo 1 42",
+                                           "pak 1 42"])
+        self.assertEqual(clients[1].data, ["bar 1 42"])
+
+    def test_hash_with_three_clients(self):
+        clients = [
+            FakeClient("127.0.0.1", 10001),
+            FakeClient("127.0.0.1", 10002),
+            FakeClient("127.0.0.1", 10003),
+            ]
+        client = ConsistentHashingClient(clients)
+        client.write("foo 1 42")
+        client.write("bar 1 42")
+        client.write("pak 1 42")
+        self.assertEqual(clients[0].data, ["foo 1 42"])
+        self.assertEqual(clients[1].data, ["bar 1 42"])
+        self.assertEqual(clients[2].data, ["pak 1 42"])
