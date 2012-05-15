@@ -1,3 +1,10 @@
+"""
+A copy of carbon.hashing, with higher replica count and more bits from the big
+hash, for a more even distribution.
+
+This copy is included here so that txstatsd.client doesn't depend on carbon.
+"""
+
 import bisect
 
 from hashlib import md5
