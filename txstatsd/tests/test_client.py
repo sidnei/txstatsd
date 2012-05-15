@@ -115,12 +115,12 @@ class TestConsistentHashingClient(TestCase):
             FakeClient("127.0.0.1", 10001),
             ]
         client = ConsistentHashingClient(clients)
-        client.write("foo 1 42")
         client.write("bar 1 42")
-        client.write("pak 1 42")
-        self.assertEqual(clients[0].data, ["foo 1 42",
-                                           "bar 1 42",
-                                           "pak 1 42"])
+        client.write("foo 1 42")
+        client.write("dba 1 42")
+        self.assertEqual(clients[0].data, ["bar 1 42",
+                                           "foo 1 42",
+                                           "dba 1 42"])
 
     def test_hash_with_two_clients(self):
         clients = [
@@ -128,12 +128,12 @@ class TestConsistentHashingClient(TestCase):
             FakeClient("127.0.0.1", 10002),
             ]
         client = ConsistentHashingClient(clients)
-        client.write("foo 1 42")
         client.write("bar 1 42")
-        client.write("pak 1 42")
-        self.assertEqual(clients[0].data, ["foo 1 42",
-                                           "pak 1 42"])
-        self.assertEqual(clients[1].data, ["bar 1 42"])
+        client.write("foo 1 42")
+        client.write("dba 1 42")
+        self.assertEqual(clients[0].data, ["bar 1 42",
+                                           "dba 1 42"])
+        self.assertEqual(clients[1].data, ["foo 1 42"])
 
     def test_hash_with_three_clients(self):
         clients = [
@@ -142,9 +142,9 @@ class TestConsistentHashingClient(TestCase):
             FakeClient("127.0.0.1", 10003),
             ]
         client = ConsistentHashingClient(clients)
-        client.write("foo 1 42")
         client.write("bar 1 42")
-        client.write("pak 1 42")
-        self.assertEqual(clients[0].data, ["foo 1 42"])
-        self.assertEqual(clients[1].data, ["bar 1 42"])
-        self.assertEqual(clients[2].data, ["pak 1 42"])
+        client.write("foo 1 42")
+        client.write("dba 1 42")
+        self.assertEqual(clients[0].data, ["bar 1 42"])
+        self.assertEqual(clients[1].data, ["foo 1 42"])
+        self.assertEqual(clients[2].data, ["dba 1 42"])
