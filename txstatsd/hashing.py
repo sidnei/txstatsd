@@ -5,7 +5,7 @@ from hashlib import md5
 
 class ConsistentHashRing:
 
-    def __init__(self, nodes, replica_count=100):
+    def __init__(self, nodes, replica_count=1024):
         self.ring = []
         self.nodes = set()
         self.replica_count = replica_count
@@ -14,7 +14,7 @@ class ConsistentHashRing:
 
     def compute_ring_position(self, key):
         big_hash = md5(str(key)).hexdigest()
-        small_hash = int(big_hash[:4], 16)
+        small_hash = long(big_hash[:8], 16)
         return small_hash
 
     def add_node(self, node):
