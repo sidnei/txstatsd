@@ -5,6 +5,7 @@ from twisted.internet.defer import inlineCallbacks, Deferred
 from twisted.python import log
 from twisted.trial.unittest import TestCase
 
+from txstatsd.metrics.metric import Metric
 from txstatsd.client import (
     StatsDClientProtocol, TwistedStatsDClient, UdpStatsDClient,
     ConsistentHashingClient)
@@ -115,12 +116,15 @@ class TestConsistentHashingClient(TestCase):
             FakeClient("127.0.0.1", 10001),
             ]
         client = ConsistentHashingClient(clients)
-        client.write("bar 1 42")
-        client.write("foo 1 42")
-        client.write("dba 1 42")
-        self.assertEqual(clients[0].data, ["bar 1 42",
-                                           "foo 1 42",
-                                           "dba 1 42"])
+        bar = Metric(client, "bar")
+        foo = Metric(client, "foo")
+        dba = Metric(client, "dba")
+        bar.send("1")
+        foo.send("1")
+        dba.send("1")
+        self.assertEqual(clients[0].data, ["bar:1",
+                                           "foo:1",
+                                           "dba:1"])
 
     def test_hash_with_two_clients(self):
         clients = [
@@ -128,12 +132,15 @@ class TestConsistentHashingClient(TestCase):
             FakeClient("127.0.0.1", 10002),
             ]
         client = ConsistentHashingClient(clients)
-        client.write("bar 1 42")
-        client.write("foo 1 42")
-        client.write("dba 1 42")
-        self.assertEqual(clients[0].data, ["bar 1 42",
-                                           "dba 1 42"])
-        self.assertEqual(clients[1].data, ["foo 1 42"])
+        bar = Metric(client, "bar")
+        foo = Metric(client, "foo")
+        dba = Metric(client, "dba")
+        bar.send("1")
+        foo.send("1")
+        dba.send("1")
+        self.assertEqual(clients[0].data, ["bar:1",
+                                           "dba:1"])
+        self.assertEqual(clients[1].data, ["foo:1"])
 
     def test_hash_with_three_clients(self):
         clients = [
@@ -142,9 +149,12 @@ class TestConsistentHashingClient(TestCase):
             FakeClient("127.0.0.1", 10003),
             ]
         client = ConsistentHashingClient(clients)
-        client.write("bar 1 42")
-        client.write("foo 1 42")
-        client.write("dba 1 42")
-        self.assertEqual(clients[0].data, ["bar 1 42"])
-        self.assertEqual(clients[1].data, ["foo 1 42"])
-        self.assertEqual(clients[2].data, ["dba 1 42"])
+        bar = Metric(client, "bar")
+        foo = Metric(client, "foo")
+        dba = Metric(client, "dba")
+        bar.send("1")
+        foo.send("1")
+        dba.send("1")
+        self.assertEqual(clients[0].data, ["bar:1"])
+        self.assertEqual(clients[1].data, ["foo:1"])
+        self.assertEqual(clients[2].data, ["dba:1"])
