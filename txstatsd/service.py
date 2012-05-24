@@ -154,7 +154,7 @@ class StatsDOptions(OptionsGlue):
          "Produce StatsD-compliant messages.", int],
         ["dump-mode", "d", 0,
          "Dump received and aggregated metrics"
-             " before passing them to carbon.", int],
+         " before passing them to carbon.", int],
         ["routing", "g", "",
          "Routing rules", str],
         ["listen-tcp-port", "t", None,
