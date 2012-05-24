@@ -64,7 +64,7 @@ class MeterMetricReporter(object):
         @type timestamp: C{float}
         @param timestamp: The timestamp for now.
         """
-        poll_prev, self.poll_time = self.poll_time, self.wall_time_func()
+        poll_prev, self.poll_time = self.poll_time, timestamp
 
         if self.poll_time == poll_prev:
             return list()
