@@ -283,9 +283,6 @@ def createService(options):
     reporting = ReportingService(instance_name)
     reporting.setServiceParent(root_service)
 
-    # Schedule updates for those metrics expecting to be
-    # periodically updated, for example the meter metric.
-    reporting.schedule(processor.update_metrics, 10, None)
     reporting.schedule(report_client_manager_stats,
                        options["flush-interval"] / 1000,
                        metrics.gauge)

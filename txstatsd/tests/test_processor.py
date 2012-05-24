@@ -355,10 +355,6 @@ class FlushMeterMetricMessagesTest(TestCase):
     def wall_clock_time(self):
         return self.time_now
 
-    def mark_minutes(self, minutes):
-        for i in range(1, minutes * 60, 5):
-            self.processor.update_metrics()
-
     def test_flush_meter_metric(self):
         """
         Test the correct rendering of the Graphite report for
@@ -369,45 +365,22 @@ class FlushMeterMetricMessagesTest(TestCase):
         self.time_now += 1
         messages = self.processor.flush()
         self.assertEqual(
-            ("stats.meter.gorets.15min_rate", 0.0, self.time_now),
+            ("stats.meter.gorets.count", 3.0, self.time_now),
             messages[0])
         self.assertEqual(
-            ("stats.meter.gorets.1min_rate", 0.0, self.time_now),
+            ("stats.meter.gorets.rate", 3.0, self.time_now),
             messages[1])
         self.assertEqual(
-            ("stats.meter.gorets.5min_rate", 0.0, self.time_now),
-            messages[2])
-        self.assertEqual(
-            ("stats.meter.gorets.count", 3.0, self.time_now),
-            messages[3])
-        self.assertEqual(
-            ("stats.meter.gorets.mean_rate", 3.0, self.time_now),
-            messages[4])
-        self.assertEqual(
             ("statsd.numStats", 1, self.time_now),
-            messages[5])
+            messages[2])
 
-        # As we are employing the expected results from test_ewma.py
-        # we perform the initial tick(), before advancing the clock 60sec.
-        self.processor.update_metrics()
-
-        self.mark_minutes(1)
         self.time_now += 60
         messages = self.processor.flush()
         self.assertEqual(
-            ("stats.meter.gorets.15min_rate", 0.561304, self.time_now),
+            ("stats.meter.gorets.count", 3.0, self.time_now),
             messages[0])
         self.assertEqual(
-            ("stats.meter.gorets.1min_rate", 0.220728, self.time_now),
+            ("stats.meter.gorets.rate", 0.0, self.time_now),
             messages[1])
         self.assertEqual(
-            ("stats.meter.gorets.5min_rate", 0.491238, self.time_now),
-            messages[2])
-        self.assertEqual(
-            ("stats.meter.gorets.count", 3.0, self.time_now),
-            messages[3])
-        self.assertEqual(
-            ("stats.meter.gorets.mean_rate", 0.049180, self.time_now),
-            messages[4])
-        self.assertEqual(
-            ("statsd.numStats", 1, self.time_now), messages[5])
+            ("statsd.numStats", 1, self.time_now), messages[2])

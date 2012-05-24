@@ -131,9 +131,6 @@ class TimerMetricReporter(object):
         if duration >= 0:
             self.histogram.update(duration)
 
-    def tick(self):
-        pass
-
     def report(self, timestamp):
         # median, 75, 95, 98, 99, 99.9 percentile
         percentiles = self.percentiles(0.5, 0.75, 0.95, 0.98, 0.99, 0.999)

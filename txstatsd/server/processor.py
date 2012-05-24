@@ -375,7 +375,3 @@ class MessageProcessor(BaseMessageProcessor):
 
         self.process_timings.clear()
         self.by_type.clear()
-
-    def update_metrics(self):
-        for metric in self.meter_metrics.itervalues():
-            metric.tick()

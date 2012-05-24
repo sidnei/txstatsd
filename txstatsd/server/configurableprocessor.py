@@ -101,9 +101,3 @@ class ConfigurableMessageProcessor(MessageProcessor):
             events += 1
 
         return (metrics, events)
-
-    def update_metrics(self):
-        super(ConfigurableMessageProcessor, self).update_metrics()
-
-        for metric in self.timer_metrics.itervalues():
-            metric.tick()
