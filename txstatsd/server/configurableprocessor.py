@@ -40,7 +40,8 @@ class ConfigurableMessageProcessor(MessageProcessor):
 
     def compose_timer_metric(self, key, duration):
         if not key in self.timer_metrics:
-            metric = TimerMetricReporter(key, prefix=self.message_prefix)
+            metric = TimerMetricReporter(key,
+                wall_time_func=self.time_function, prefix=self.message_prefix)
             self.timer_metrics[key] = metric
         self.timer_metrics[key].update(duration)
 
