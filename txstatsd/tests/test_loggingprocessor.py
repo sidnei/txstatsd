@@ -1,4 +1,3 @@
-
 from unittest import TestCase
 
 from twisted.plugins.distinct_plugin import distinct_metric_factory
@@ -45,7 +44,7 @@ class TestLoggingMessageProcessor(TestCase):
         processor.meter_metrics['test'] = metric
         processor.flush()
         expected = ["Out: %s %s %s" % message
-                for message in metric.report()]
+                    for message in metric.report()]
         self.assertFalse(set(expected).difference(logger.log.splitlines()))
 
     def test_logger_plugin(self):
@@ -58,7 +57,6 @@ class TestLoggingMessageProcessor(TestCase):
         processor.flush()
         messages = processor.plugin_metrics['gorets'].flush(
             10, processor.time_function())
-        expected = ["In: %s" % msg_in]\
-            + ["Out: %s %s %s" % message
-                for message in messages]
+        expected = ["In: %s" % msg_in] + ["Out: %s %s %s" % message
+                                          for message in messages]
         self.assertFalse(set(expected).difference(logger.log.splitlines()))
