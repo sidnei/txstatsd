@@ -1,17 +1,12 @@
 import time
 
 from txstatsd.metrics.metric import Metric
-from txstatsd.stats.ewma import Ewma
 
 
 class MeterMetric(Metric):
     """
-    A meter metric which measures mean throughput and one-, five-, and
-    fifteen-minute exponentially-weighted moving average throughputs.
-
-    See:
-    - U{EMA
-    <http://en.wikipedia.org/wiki/Moving_average#Exponential_moving_average>}
+    A simplier meter metric which measures instant throughput rate for each
+    interval.
     """
 
     def __init__(self, connection, name, sample_rate=1):
@@ -33,12 +28,8 @@ class MeterMetric(Metric):
 
 class MeterMetricReporter(object):
     """
-    A meter metric which measures mean throughput and one-, five-, and
-    fifteen-minute exponentially-weighted moving average throughputs.
-
-    See:
-    - U{EMA
-    <http://en.wikipedia.org/wiki/Moving_average#Exponential_moving_average>}
+    A simplier meter metric which measures instant throughput rate for each
+    interval.
     """
 
     def __init__(self, name, wall_time_func=time.time, prefix=""):
@@ -54,50 +45,40 @@ class MeterMetricReporter(object):
             prefix += "."
         self.prefix = prefix
 
-        self.m1_rate = Ewma.one_minute_ewma()
-        self.m5_rate = Ewma.five_minute_ewma()
-        self.m15_rate = Ewma.fifteen_minute_ewma()
-        self.count = 0
-        self.start_time = self.wall_time_func()
+        self.value = self.count = 0
+        self.poll_time = self.wall_time_func()
 
-    def mark(self, value=1):
-        """Mark the occurrence of a given number of events."""
-        self.count += value
-        self.m1_rate.update(value)
-        self.m5_rate.update(value)
-        self.m15_rate.update(value)
+    def mark(self, value):
+        """
+        Process new data for this metric.
 
-    def tick(self):
-        """Updates the moving averages."""
-        self.m1_rate.tick()
-        self.m5_rate.tick()
-        self.m15_rate.tick()
+        @type value: C{float}
+        @param value: The reported value, to be aggregate into the meter.
+        """
+        self.value += value
 
     def report(self, timestamp):
-        metrics = []
-        items = {".count": self.count,
-                 ".mean_rate": self.mean_rate(),
-                 ".1min_rate": self.one_minute_rate(),
-                 ".5min_rate": self.five_minute_rate(),
-                 ".15min_rate": self.fifteen_minute_rate()}
+        """
+        Returns a list of metrics to report.
 
-        for item, value in items.iteritems():
+        @type timestamp: C{float}
+        @param timestamp: The timestamp for now.
+        """
+        poll_prev, self.poll_time = self.poll_time, timestamp
+
+        if self.poll_time == poll_prev:
+            return list()
+
+        rate = float(self.value) / (self.poll_time - poll_prev)
+        self.count, self.value = self.count + self.value, 0
+
+        metrics = []
+        items = {
+            ".count": self.count,
+            ".rate": rate
+            }
+
+        for item, value in sorted(items.iteritems()):
             metrics.append((self.prefix + self.name + item,
                             round(value, 6), timestamp))
         return metrics
-
-    def fifteen_minute_rate(self):
-        return self.m15_rate.rate
-
-    def five_minute_rate(self):
-        return self.m5_rate.rate
-
-    def one_minute_rate(self):
-        return self.m1_rate.rate
-
-    def mean_rate(self):
-        if self.count == 0:
-            return 0.0
-        else:
-            elapsed = self.wall_time_func() - self.start_time
-            return float(self.count) / elapsed

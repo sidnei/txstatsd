@@ -1,13 +1,13 @@
-import ConfigParser
 import tempfile
-from unittest import TestCase
+import ConfigParser
 from StringIO import StringIO
+
+from twisted.trial.unittest import TestCase
 
 from carbon.client import CarbonClientManager
 
 from twisted.internet.defer import inlineCallbacks, Deferred
 from twisted.internet.protocol import DatagramProtocol
-from twisted.internet.test.reactormixins import ReactorBuilder
 from twisted.application.internet import UDPServer
 
 from txstatsd import service
@@ -186,7 +186,7 @@ class Agent(DatagramProtocol):
         self.monitor_response = data
 
 
-class ServiceTestsBuilder(ReactorBuilder):
+class ServiceTestsBuilder(TestCase):
 
     def test_service(self):
         """
@@ -243,7 +243,7 @@ class ServiceTestsBuilder(ReactorBuilder):
         The StatsD service messages the expected response to the
         monitoring agent.
         """
-        reactor = self.buildReactor()
+        from twisted.internet import reactor
 
         options = service.StatsDOptions()
         processor = MessageProcessor()
@@ -280,7 +280,5 @@ class ServiceTestsBuilder(ReactorBuilder):
                 reactor.stop()
 
         reactor.callWhenRunning(exercise)
-        self.runReactor(reactor)
+        reactor.run()
 
-
-globals().update(ServiceTestsBuilder.makeTestCaseClasses())

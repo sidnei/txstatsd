@@ -100,17 +100,11 @@ class FlushMessagesTest(TestCase):
             time_function=lambda: _now)
 
         configurable_processor.process("glork:4|ms")
-        configurable_processor.update_metrics()
         configurable_processor.process("glork:8|ms")
-        configurable_processor.update_metrics()
         configurable_processor.process("glork:15|ms")
-        configurable_processor.update_metrics()
         configurable_processor.process("glork:16|ms")
-        configurable_processor.update_metrics()
         configurable_processor.process("glork:23|ms")
-        configurable_processor.update_metrics()
         configurable_processor.process("glork:42|ms")
-        configurable_processor.update_metrics()
 
         _now = 42
         messages = configurable_processor.flush()
@@ -155,13 +149,7 @@ class FlushMeterMetricMessagesTest(TestCase):
 
         self.time_now += 1
         messages = self.configurable_processor.flush()
-        self.assertEqual(("test.metric.gorets.15min_rate", 0.0, self.time_now),
-                         messages[0])
-        self.assertEqual(("test.metric.gorets.1min_rate", 0.0, self.time_now),
-                         messages[1])
-        self.assertEqual(("test.metric.gorets.5min_rate", 0.0, self.time_now),
-                         messages[2])
         self.assertEqual(("test.metric.gorets.count", 3.0, self.time_now),
-                         messages[3])
-        self.assertEqual(("test.metric.gorets.mean_rate", 3.0, self.time_now),
-                         messages[4])
+                         messages[0])
+        self.assertEqual(("test.metric.gorets.rate", 3.0, self.time_now),
+                         messages[1])
