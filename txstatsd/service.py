@@ -4,6 +4,7 @@ import sys
 import time
 import ConfigParser
 import platform
+import functools
 
 from twisted.application.internet import UDPServer, TCPServer
 from twisted.application.service import MultiService
@@ -15,6 +16,7 @@ from txstatsd.metrics.metrics import Metrics
 from txstatsd.metrics.extendedmetrics import ExtendedMetrics
 from txstatsd.server.processor import MessageProcessor
 from txstatsd.server.configurableprocessor import ConfigurableMessageProcessor
+from txstatsd.server.loggingprocessor import LoggingMessageProcessor
 from txstatsd.server.protocol import (
     StatsDServerProtocol, StatsDTCPServerFactory)
 from txstatsd.server.router import Router
@@ -150,6 +152,9 @@ class StatsDOptions(OptionsGlue):
          "Response we should send monitoring agent.", str],
         ["statsd-compliance", "s", 1,
          "Produce StatsD-compliant messages.", int],
+        ["dump-mode", "d", 0,
+         "Dump received and aggregated metrics"
+             " before passing them to carbon.", int],
         ["routing", "g", "",
          "Routing rules", str],
         ["listen-tcp-port", "t", None,
@@ -246,13 +251,21 @@ def createService(options):
         plugin.configure(options)
         plugin_metrics.append(plugin)
 
+    processor = None
+    if options["dump-mode"]:
+        # LoggingMessageProcessor supersedes
+        #  any other processor class in "dump-mode"
+        assert not hasattr(log, 'info')
+        log.info = log.msg # for compatibility with LMP logger interface
+        processor = functools.partial(LoggingMessageProcessor, logger=log)
+
     if options["statsd-compliance"]:
-        processor = MessageProcessor(plugins=plugin_metrics)
+        processor = (processor or MessageProcessor)(plugins=plugin_metrics)
         input_router = Router(processor, options['routing'], root_service)
         connection = InternalClient(input_router)
         metrics = Metrics(connection)
     else:
-        processor = ConfigurableMessageProcessor(
+        processor = (processor or ConfigurableMessageProcessor)(
             message_prefix=prefix,
             internal_metrics_prefix=prefix + "." + instance_name + ".",
             plugins=plugin_metrics)

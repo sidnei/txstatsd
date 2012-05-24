@@ -44,20 +44,21 @@ class TestLoggingMessageProcessor(TestCase):
         metric = FakeMeterMetric()
         processor.meter_metrics['test'] = metric
         processor.flush()
-        expected = "\n".join(["%s %s %s" % message
-                              for message in metric.report()])
-        self.assertEqual(expected + "\n", logger.log)
+        expected = ["Out: %s %s %s" % message
+                for message in metric.report()]
+        self.assertFalse(set(expected).difference(logger.log.splitlines()))
 
     def test_logger_plugin(self):
         logger = TestLogger()
         processor = LoggingMessageProcessor(
             logger, plugins=[distinct_metric_factory],
             time_function=lambda: 42)
-        processor.process("gorets:17|pd")
+        msg_in = "gorets:17|pd"
+        processor.process(msg_in)
         processor.flush()
         messages = processor.plugin_metrics['gorets'].flush(
             10, processor.time_function())
-        expected = "\n".join(["%s %s %s" % message
-                              for message in messages])
-        self.assertEqual(expected + "\n", logger.log)
-
+        expected = ["In: %s" % msg_in]\
+            + ["Out: %s %s %s" % message
+                for message in messages]
+        self.assertFalse(set(expected).difference(logger.log.splitlines()))
