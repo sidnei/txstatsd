@@ -6,8 +6,8 @@ from twisted.web import resource
 from txstatsd.metrics.histogrammetric import HistogramMetricReporter
 from txstatsd.metrics.metermetric import MeterMetricReporter
 from txstatsd.metrics.metric import Metric
-from txstatsd.stats.exponentiallydecayingsample \
-    import ExponentiallyDecayingSample
+from txstatsd.stats.uniformsample \
+    import UniformSample
 
 
 class TimerMetric(Metric):
@@ -69,30 +69,25 @@ class TimerMetricReporter(object):
             prefix += "."
         self.prefix = prefix
 
-        sample = ExponentiallyDecayingSample(1028, 0.015)
+        sample = UniformSample(1028)
         self.histogram = HistogramMetricReporter(sample)
-        self.meter = MeterMetricReporter(
-            "calls", wall_time_func=self.wall_time_func)
+        # total number of values seen
+        self.count = 0
         self.clear()
 
-    def clear(self):
+    def clear(self, timestamp=None):
         """Clears all recorded durations."""
         self.histogram.clear()
+        if timestamp is None:
+            timestamp = self.wall_time_func()
+        self.last_time = float(timestamp)
 
-    def count(self):
-        return self.histogram.count
-
-    def fifteen_minute_rate(self):
-        return self.meter.fifteen_minute_rate()
-
-    def five_minute_rate(self):
-        return self.meter.five_minute_rate()
-
-    def mean_rate(self):
-        return self.meter.mean_rate()
-
-    def one_minute_rate(self):
-        return self.meter.one_minute_rate()
+    def rate(self, timestamp):
+        """The number of values seen since last clear."""
+        dt = (timestamp - self.last_time)
+        if dt == 0:
+            return 0
+        return self.histogram.count / dt
 
     def max(self):
         """Returns the longest recorded duration."""
@@ -132,13 +127,12 @@ class TimerMetricReporter(object):
 
         @param duration: The length of the duration in seconds.
         """
+        self.count += 1
         if duration >= 0:
             self.histogram.update(duration)
-            self.meter.mark()
 
     def tick(self):
-        """Updates the moving averages."""
-        self.meter.tick()
+        pass
 
     def report(self, timestamp):
         # median, 75, 95, 98, 99, 99.9 percentile
@@ -150,12 +144,11 @@ class TimerMetricReporter(object):
                  ".stddev": self.std_dev(),
                  ".99percentile": percentiles[4],
                  ".999percentile": percentiles[5],
-                 ".count": self.meter.count,
-                 ".1min_rate": self.meter.one_minute_rate(),
-                 ".5min_rate": self.meter.five_minute_rate(),
-                 ".15min_rate": self.meter.fifteen_minute_rate()}
-
+                 ".count": self.count,
+                 ".rate": self.rate(timestamp),
+            }
         for item, value in items.iteritems():
             metrics.append((self.prefix + self.name + item,
                             round(value, 6), timestamp))
+        self.clear(timestamp)
         return metrics

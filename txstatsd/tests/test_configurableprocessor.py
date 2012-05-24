@@ -64,29 +64,40 @@ class FlushMessagesTest(TestCase):
         If a single timer with a single data point is present, all
         percentiles will be set to the same value.
         """
+
+        _now = 40
+
         configurable_processor = ConfigurableMessageProcessor(
-            time_function=lambda: 42)
+            time_function=lambda: _now)
 
         configurable_processor.process("glork:24|ms")
-        messages = configurable_processor.flush()
+        _now = 42
 
-        self.assertEqual(('glork.15min_rate', 0.0, 42), messages[0])
-        self.assertEqual(('glork.1min_rate', 0.0, 42), messages[1])
-        self.assertEqual(('glork.5min_rate', 0.0, 42), messages[2])
-        self.assertEqual(("glork.999percentile", 24.0, 42), messages[3])
-        self.assertEqual(("glork.99percentile", 24.0, 42), messages[4])
-        self.assertEqual(("glork.count", 1., 42), messages[5])
-        self.assertEqual(("glork.max", 24.0, 42), messages[6])
-        self.assertEqual(("glork.mean", 24.0, 42), messages[7])
-        self.assertEqual(("glork.min", 24.0, 42), messages[8])
-        self.assertEqual(("glork.stddev", 0.0, 42), messages[9])
+        messages = configurable_processor.flush()
+        messages.sort()
+
+        expected = [
+            ("glork.999percentile", 24.0, 42),
+            ("glork.99percentile", 24.0, 42),
+            ('glork.count', 1.0, 42),
+            ("glork.max", 24.0, 42),
+            ("glork.mean", 24.0, 42),
+            ("glork.min", 24.0, 42),
+            ('glork.rate', 0.5, 42),
+            ("glork.stddev", 0.0, 42),
+            ]
+        expected.sort()
+
+        for e, f in zip(expected, messages):
+            self.assertEqual(e, f)
 
     def test_flush_single_timer_multiple_times(self):
         """
         Test reporting of multiple timer metric samples.
         """
+        _now = 40
         configurable_processor = ConfigurableMessageProcessor(
-            time_function=lambda: 42)
+            time_function=lambda: _now)
 
         configurable_processor.process("glork:4|ms")
         configurable_processor.update_metrics()
@@ -101,21 +112,24 @@ class FlushMessagesTest(TestCase):
         configurable_processor.process("glork:42|ms")
         configurable_processor.update_metrics()
 
+        _now = 42
         messages = configurable_processor.flush()
+        messages.sort()
 
-        self.assertEqual(('glork.15min_rate', 0.20000000000000001, 42),
-            messages[0])
-        self.assertEqual(('glork.1min_rate', 0.20000000000000001, 42),
-            messages[1])
-        self.assertEqual(('glork.5min_rate', 0.20000000000000001, 42),
-            messages[2])
-        self.assertEqual(("glork.999percentile", 42.0, 42), messages[3])
-        self.assertEqual(("glork.99percentile", 42.0, 42), messages[4])
-        self.assertEqual(('glork.count', 6.0, 42), messages[5])
-        self.assertEqual(("glork.max", 42.0, 42), messages[6])
-        self.assertEqual(("glork.mean", 18.0, 42), messages[7])
-        self.assertEqual(("glork.min", 4.0, 42), messages[8])
-        self.assertEqual(("glork.stddev", 13.490738, 42), messages[9])
+        expected = [
+            ("glork.999percentile", 42.0, 42),
+            ("glork.99percentile", 42.0, 42),
+            ('glork.count', 6.0, 42),
+            ("glork.max", 42.0, 42),
+            ("glork.mean", 18.0, 42),
+            ("glork.min", 4.0, 42),
+            ('glork.rate', 3, 42),
+            ("glork.stddev", 13.490738, 42),
+            ]
+        expected.sort()
+
+        for e, f in zip(expected, messages):
+            self.assertEqual(e, f)
 
 
 class FlushMeterMetricMessagesTest(TestCase):

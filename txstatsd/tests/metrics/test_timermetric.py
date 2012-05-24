@@ -1,5 +1,6 @@
 
 import math
+import time
 
 from twisted.trial.unittest import TestCase
 
@@ -9,7 +10,6 @@ from txstatsd.metrics.timermetric import TimerMetricReporter
 class TestBlankTimerMetric(TestCase):
     def setUp(self):
         self.timer = TimerMetricReporter('test')
-        self.timer.tick()
 
     def test_max(self):
         self.assertEqual(
@@ -28,7 +28,7 @@ class TestBlankTimerMetric(TestCase):
 
     def test_count(self):
         self.assertEqual(
-            self.timer.count(), 0,
+            self.timer.count, 0,
             'Should have a count of zero')
 
     def test_std_dev(self):
@@ -54,25 +54,10 @@ class TestBlankTimerMetric(TestCase):
             percentiles[4], 0,
             'Should have p99.9 of zero')
 
-    def test_mean_rate(self):
+    def test_rate(self):
         self.assertEqual(
-            self.timer.mean_rate(), 0,
-            'Should have a mean rate of zero')
-
-    def test_one_minute_rate(self):
-        self.assertEqual(
-            self.timer.one_minute_rate(), 0,
+            self.timer.rate(time.time()), 0,
             'Should have a one-minute rate of zero`')
-
-    def test_five_minute_rate(self):
-        self.assertEqual(
-            self.timer.five_minute_rate(), 0,
-            'Should have a five-minute rate of zero')
-
-    def test_fifteen_minute_rate(self):
-        self.assertEqual(
-            self.timer.fifteen_minute_rate(), 0,
-            'Should have a fifteen-minute rate of zero')
 
     def test_no_values(self):
         self.assertEqual(
@@ -83,7 +68,6 @@ class TestBlankTimerMetric(TestCase):
 class TestTimingSeriesEvents(TestCase):
     def setUp(self):
         self.timer = TimerMetricReporter('test')
-        self.timer.tick()
         self.timer.update(10)
         self.timer.update(20)
         self.timer.update(20)
@@ -92,7 +76,7 @@ class TestTimingSeriesEvents(TestCase):
 
     def test_count(self):
         self.assertEqual(
-            self.timer.count(), 5,
+            self.timer.count, 5,
             'Should record the count')
 
     def test_min(self):
