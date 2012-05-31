@@ -165,11 +165,16 @@ report_process_io_counters = report_counters(process_report.get_io_counters)
 report_process_net_stats = process_report.get_net_stats
 
 
-def report_system_stats(prefix="sys"):
-    cpu_times = psutil.cpu_times()._asdict()
+def report_system_stats(prefix="sys", percpu=False):
+    cpu_times = psutil.cpu_times(percpu=percpu)
     system_stats = {}
-    for mode, time in cpu_times.iteritems():
-        system_stats[prefix + ".cpu." + mode] = time
+    if not percpu:
+        for mode, time in cpu_times._asdict().iteritems():
+            system_stats[prefix + ".cpu." + mode] = time
+    else:
+        for idx, cpu_time in enumerate(cpu_times):
+            for mode, time in cpu_time._asdict().iteritems():
+                system_stats[prefix + ".cpu.%03d." % idx + mode] = time
     return system_stats
 
 
