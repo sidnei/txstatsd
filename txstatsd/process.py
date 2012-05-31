@@ -134,7 +134,7 @@ class ProcessReport(object):
         return result
 
 
-def report_counters(report_function):
+def report_counters(report_function, *args, **kwargs):
     """
     Report difference between last value and current value for wrapped
     function.
@@ -143,7 +143,7 @@ def report_counters(report_function):
         last_value = None
         while True:
             result = {}
-            new_value = report_function()
+            new_value = report_function(*args, **kwargs)
             if last_value is None:
                 last_value = new_value
             else:
