@@ -82,7 +82,7 @@ class TestSystemPerformance(TestCase, MockerTestCase):
         """System cpu counters are collected through psutil."""
         cpu_times = psutil.cpu_times()
         mock = self.mocker.replace("psutil.cpu_times")
-        self.expect(mock()).result(cpu_times)
+        self.expect(mock(percpu=False)).result(cpu_times)
         self.mocker.replay()
 
         result = report_system_stats()
@@ -107,6 +107,52 @@ class TestSystemPerformance(TestCase, MockerTestCase):
             self.assertEqual(cpu_times.system, result["sys.cpu.system"])
             self.assertEqual(cpu_times.idle, result["sys.cpu.idle"])
             self.assertEqual(cpu_times.irq, result["sys.cpu.irq"])
+
+    def test_per_cpu_counters(self):
+        """System percpu counters are collected through psutil."""
+        cpu_times = psutil.cpu_times()
+        mock = self.mocker.replace("psutil.cpu_times")
+        self.expect(mock(percpu=True)).result([cpu_times, cpu_times])
+        self.mocker.replay()
+
+        result = report_system_stats(percpu=True)
+        # cpu_times is platform-dependent
+        if sys.platform.lower().startswith("linux"):
+            self.assertEqual(cpu_times.user, result["sys.cpu.000.user"])
+            self.assertEqual(cpu_times.system, result["sys.cpu.000.system"])
+            self.assertEqual(cpu_times.idle, result["sys.cpu.000.idle"])
+            self.assertEqual(cpu_times.iowait, result["sys.cpu.000.iowait"])
+            self.assertEqual(cpu_times.irq, result["sys.cpu.001.irq"])
+            self.assertEqual(cpu_times.user, result["sys.cpu.001.user"])
+            self.assertEqual(cpu_times.system, result["sys.cpu.001.system"])
+            self.assertEqual(cpu_times.idle, result["sys.cpu.001.idle"])
+            self.assertEqual(cpu_times.iowait, result["sys.cpu.001.iowait"])
+            self.assertEqual(cpu_times.irq, result["sys.cpu.001.irq"])
+        elif sys.platform.lower().startswith("win32"):
+            self.assertEqual(cpu_times.user, result["sys.cpu.000.user"])
+            self.assertEqual(cpu_times.system, result["sys.cpu.000.system"])
+            self.assertEqual(cpu_times.idle, result["sys.cpu.000.idle"])
+            self.assertEqual(cpu_times.user, result["sys.cpu.001.user"])
+            self.assertEqual(cpu_times.system, result["sys.cpu.001.system"])
+            self.assertEqual(cpu_times.idle, result["sys.cpu.001.idle"])
+        elif sys.platform.lower().startswith("darwin"):
+            self.assertEqual(cpu_times.user, result["sys.cpu.000.user"])
+            self.assertEqual(cpu_times.system, result["sys.cpu.000.system"])
+            self.assertEqual(cpu_times.idle, result["sys.cpu.000.idle"])
+            self.assertEqual(cpu_times.nice, result["sys.cpu.000.nice"])
+            self.assertEqual(cpu_times.user, result["sys.cpu.001.user"])
+            self.assertEqual(cpu_times.system, result["sys.cpu.001.system"])
+            self.assertEqual(cpu_times.idle, result["sys.cpu.001.idle"])
+            self.assertEqual(cpu_times.nice, result["sys.cpu.001.nice"])
+        elif sys.platform.lower().startswith("freebsd"):
+            self.assertEqual(cpu_times.user, result["sys.cpu.000.user"])
+            self.assertEqual(cpu_times.system, result["sys.cpu.000.system"])
+            self.assertEqual(cpu_times.idle, result["sys.cpu.000.idle"])
+            self.assertEqual(cpu_times.irq, result["sys.cpu.000.irq"])
+            self.assertEqual(cpu_times.user, result["sys.cpu.001.user"])
+            self.assertEqual(cpu_times.system, result["sys.cpu.001.system"])
+            self.assertEqual(cpu_times.idle, result["sys.cpu.001.idle"])
+            self.assertEqual(cpu_times.irq, result["sys.cpu.001.irq"])
 
     def test_self_cpu_and_memory_stats(self):
         """
