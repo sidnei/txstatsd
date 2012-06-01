@@ -4,6 +4,7 @@ from twisted.plugin import IPlugin
 from txstatsd.itxstatsd import IMetricFactory
 from txstatsd.metrics.distinctmetric import DistinctMetricReporter
 
+
 class DistinctMetricFactory(object):
     implements(IMetricFactory, IPlugin)
 
