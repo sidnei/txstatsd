@@ -1,5 +1,6 @@
 # -*- coding: utf-8 *-*
 import fnmatch
+import re
 
 from zope.interface import implements
 
@@ -35,20 +36,25 @@ class SLIMetricFactory(object):
             return
 
         rules = rules.strip()
+        regexp = "(.*) => (.*) IF (\w*)(.*)"
+        mo = re.compile(regexp)
         for rule in rules.split("\n"):
-            head = rule.split("=>")[0].strip()
+
+            result = mo.match(rule)
+            if result is None:
+                raise TypeError("Did not match rule spec: %s" % (regexp,))
+
+            head, label, cname, cparams = result.groups()
+            cparams = cparams[1:]
+
             self.config.setdefault(head, {})
 
-            body = rule.split("=>")[1].strip()
-            label = body.split(" IF ")[0].strip()
-            condition = body.split(" IF ")[1].strip()
-            condition_name = condition.split(" ")[0].strip()
-            condition_params = condition.split(" ")[1:]
-            method = getattr(self, "build_" + condition_name, None)
+            method = getattr(self, "build_" + cname, None)
             if method is None:
-                raise TypeError("cannot build condition: %s" % condition)
+                raise TypeError("cannot build condition: %s %s" % (
+                    cname, cparams))
 
-            cobj = method(*condition_params)
+            cobj = method(*cparams.split(" "))
             self.config[head][label] = cobj
 
     def build_above(self, value):
