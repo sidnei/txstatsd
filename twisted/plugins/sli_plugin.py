@@ -42,8 +42,8 @@ class SLIMetricFactory(object):
 
             result = mo.match(rule)
             if result is None:
-                raise TypeError("Did not match rule spec: %s (rule line %d)"
-                    % (regexp, line_no))
+                raise TypeError("Did not match rule spec: %s (rule %d: %s)"
+                    % (regexp, line_no, rule))
 
             head, label, cname, cparams = result.groups()
             cparams = cparams[1:]
