@@ -38,11 +38,12 @@ class SLIMetricFactory(object):
         rules = rules.strip()
         regexp = "(.*) => (.*) IF (\w*)(.*)"
         mo = re.compile(regexp)
-        for rule in rules.split("\n"):
+        for line_no, rule in enumerate(rules.split("\n")):
 
             result = mo.match(rule)
             if result is None:
-                raise TypeError("Did not match rule spec: %s" % (regexp,))
+                raise TypeError("Did not match rule spec: %s (rule line %d)"
+                    % (regexp, line_no))
 
             head, label, cname, cparams = result.groups()
             cparams = cparams[1:]
