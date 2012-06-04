@@ -71,7 +71,7 @@ class TestFactory(TestCase):
             "rules = \n"
             "   test => red IF below 5\n"
             "   test => green IF between 0.1 3\n"
-            "   other => red IF above 4\n"))
+            "   other* => red IF above 4\n"))
         o.configure(config_file)
         smf = SLIMetricFactory()
         smf.configure(o)
@@ -83,7 +83,7 @@ class TestFactory(TestCase):
         self.assertTrue(isinstance(gc, BetweenCondition))
         self.assertEquals(gc.hi, 3)
         self.assertEquals(gc.low, 0.1)
-        smr = smf.build_metric("", "other")
+        smr = smf.build_metric("", "otherXX")
         rc = smr.conditions["red"]
         self.assertTrue(isinstance(rc, AboveCondition))
         self.assertEquals(rc.value, 4)

@@ -36,7 +36,7 @@ class SLIMetricFactory(object):
             return
 
         rules = rules.strip()
-        regexp = "(\w+) => (\w+) IF (\w+)(.*)"
+        regexp = "([\w\.\*\?]+) => (\w+) IF (\w+)(.*)"
         mo = re.compile(regexp)
         for line_no, rule in enumerate(rules.split("\n")):
 
