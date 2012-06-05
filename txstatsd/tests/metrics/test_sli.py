@@ -77,13 +77,13 @@ class TestFactory(TestCase):
         config_file = ConfigParser.RawConfigParser()
         config_file.readfp(StringIO("[statsd]\n\n[plugin_sli]\n"
             "rules = \n"
-            "   test => red IF below 5\n"
-            "   test => green IF between 0.1 3\n"
+            "   test_o-k => red IF below 5\n"
+            "   test_o-k => green IF between 0.1 3\n"
             "   other* => red IF above 4\n"))
         o.configure(config_file)
         smf = SLIMetricFactory()
         smf.configure(o)
-        smr = smf.build_metric("", "test")
+        smr = smf.build_metric("", "test_o-k")
         rc = smr.conditions["red"]
         self.assertTrue(isinstance(rc, BelowCondition))
         self.assertEquals(rc.value, 5)

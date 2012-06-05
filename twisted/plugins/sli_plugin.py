@@ -20,7 +20,12 @@ class SLIMetricFactory(object):
         self.config = {}
 
     def build_metric(self, prefix, name, wall_time_func=None):
-        path = prefix + name
+        if prefix:
+            if not prefix[-1] == ".":
+                prefix = prefix + "."
+            path = prefix + name
+        else:
+            path = name
         result = {}
         for pattern, conditions in self.config.items():
             if fnmatch.fnmatch(path, pattern):
@@ -36,7 +41,7 @@ class SLIMetricFactory(object):
             return
 
         rules = rules.strip()
-        regexp = "([\w\.\*\?]+) => (\w+) IF (\w+)(.*)"
+        regexp = "([\w\.\*\?\_\-]+) => (\w+) IF (\w+)(.*)"
         mo = re.compile(regexp)
         for line_no, rule in enumerate(rules.split("\n")):
 
