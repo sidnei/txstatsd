@@ -58,6 +58,14 @@ class TestMetric(TestCase):
             ("test.count_yellow", 2, 0)],
             rows)
 
+    def test_clear(self):
+        self.sli.update(1)
+        self.sli.update(1)
+        self.assertEquals(self.sli.count, 2)
+        self.sli.flush(0, 0)
+        self.sli.update(1)
+        self.assertEquals(self.sli.count, 1)
+
 
 class TestFactory(TestCase):
     def test_configure(self):

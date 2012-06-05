@@ -32,9 +32,12 @@ class SLIMetricReporter(object):
     def __init__(self, name, conditions):
         self.name = name
         self.conditions = conditions
-        self.count = 0
         self.conditions = conditions
-        self.counts = dict((k, 0) for k in conditions)
+        self.clear()
+
+    def clear(self):
+        self.counts = dict((k, 0) for k in self.conditions)
+        self.count = 0
 
     def process(self, fields):
         self.update(float(fields[0]))
@@ -53,4 +56,6 @@ class SLIMetricReporter(object):
                             value, timestamp))
         metrics.append((self.name + ".count",
                             self.count, timestamp))
+
+        self.clear()
         return metrics
