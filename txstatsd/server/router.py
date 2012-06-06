@@ -42,6 +42,7 @@ from twisted.python import log
 from txstatsd.server.processor import BaseMessageProcessor
 from txstatsd.client import StatsDClientProtocol, TwistedStatsDClient
 
+
 class StopProcessingException(Exception):
 
     pass
