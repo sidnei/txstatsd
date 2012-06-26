@@ -7,13 +7,15 @@ from txstatsd.metrics.metric import Metric
 
 
 class GenericMetric(Metric):
-    def __init__(self, connection, key, name, sample_rate=1):
-        super(GenericMetric, self).__init__(connection, name,
-                                            sample_rate=sample_rate)
+    def __init__(self, connection, key, name):
+        super(GenericMetric, self).__init__(connection, name)
         self.key = key
 
-    def mark(self, value):
-        self.send("%s|%s" % (value, self.key))
+    def mark(self, value, extra=None):
+        if extra is None:
+            self.send("%s|%s" % (value, self.key))
+        else:
+            self.send("%s|%s|%s" % (value, self.key, extra))
 
 
 class Metrics(object):
@@ -32,7 +34,7 @@ class Metrics(object):
         self._metrics = {}
         self.last_time = 0
 
-    def report(self, name, value, metric_type, sample_rate=1):
+    def report(self, name, value, metric_type, extra=None):
         """Report a generic metric.
 
         Used for server side plugins without client support.
@@ -41,10 +43,26 @@ class Metrics(object):
         if not name in self._metrics:
             metric = GenericMetric(self.connection,
                                         metric_type,
-                                        name,
-                                        sample_rate)
+                                        name)
             self._metrics[name] = metric
-        self._metrics[name].mark(value)
+        self._metrics[name].mark(value, extra)
+
+    def sli(self, name, duration, size=None):
+        """Report a service level metric.
+
+        The optional size parameter is used with linear thereshold slis.
+        So for example, to report a download you could use size and the size in
+        bytes of the file.
+        """
+        self.report(name, duration, "sli", size)
+
+    def sli_error(self, name):
+        """Report an error for a service level metric.
+
+        When something that is measures for service level errs (no time or size
+        are required/present) you can use this method to inform it.
+        """
+        self.report(name, "error", "sli")
 
     def gauge(self, name, value, sample_rate=1):
         """Report an instantaneous reading of a particular value."""

@@ -7,6 +7,7 @@ from twisted.plugins.sli_plugin import SLIMetricFactory
 from txstatsd.metrics.slimetric import (
     SLIMetricReporter, BetweenCondition, AboveCondition, BelowCondition)
 from txstatsd import service
+from txstatsd.tests.test_processor import TestMessageProcessor
 
 
 class TestConditions(TestCase):
@@ -27,6 +28,28 @@ class TestConditions(TestCase):
         self.assertEquals(c(6), False)
         self.assertEquals(c(2.6), True)
 
+    def test_below_linear(self):
+        c = BelowCondition(5, 1)
+        self.assertEquals(c(5.5, 1), True)
+        self.assertEquals(c(6.5, 2), True)
+        self.assertEquals(c(8.5, 3), False)
+
+    def test_above_linear(self):
+        c = AboveCondition(4, 1)
+        self.assertEquals(c(5.5, 1), True)
+        self.assertEquals(c(6.5, 2), True)
+        self.assertEquals(c(7, 3), False)
+
+
+class TestParsing(TestCase):
+    def setUp(self):
+        self.processor = TestMessageProcessor()
+
+    def test_parse(self):
+        self.processor.process('txstatsd.tests.users:100|sli')
+        self.processor.process('txstatsd.tests.users:100|sli|2')
+        self.processor.process('txstatsd.tests.users:error|sli')
+
 
 class TestMetric(TestCase):
     def setUp(self):
@@ -38,6 +61,13 @@ class TestMetric(TestCase):
         self.sli.update(1)
         self.sli.update(1)
         self.assertEquals(self.sli.count, 2)
+
+    def test_count_error(self):
+        self.sli.update(1)
+        self.sli.update("error")
+        self.assertEquals(self.sli.count, 2)
+        self.assertEquals(self.sli.error, 1)
+        self.assertEquals(self.sli.counts["red"], 1)
 
     def test_count_threshold(self):
         self.assertEquals(self.sli.count, 0)
@@ -55,7 +85,8 @@ class TestMetric(TestCase):
         self.assertEquals(
             [("test.count", 6, 0),
             ("test.count_red", 4, 0),
-            ("test.count_yellow", 2, 0)],
+            ("test.count_yellow", 2, 0),
+            ("test.error", 0, 0)],
             rows)
 
     def test_clear(self):
@@ -65,6 +96,23 @@ class TestMetric(TestCase):
         self.sli.flush(0, 0)
         self.sli.update(1)
         self.assertEquals(self.sli.count, 1)
+
+
+class TestMetricLinear(TestCase):
+    def setUp(self):
+        self.sli = SLIMetricReporter('test', {
+                        "red": BelowCondition(5, 1),
+                        "yellow": BelowCondition(3, 1)})
+
+    def test_count_threshold(self):
+        self.assertEquals(self.sli.count, 0)
+        self.assertEquals(self.sli.counts["red"], 0)
+        self.assertEquals(self.sli.counts["yellow"], 0)
+        for i in range(1, 7):
+            self.sli.update(7, i)
+        self.assertEquals(self.sli.count, 6)
+        self.assertEquals(self.sli.counts["red"], 4)
+        self.assertEquals(self.sli.counts["yellow"], 2)
 
 
 class TestFactory(TestCase):
@@ -95,3 +143,27 @@ class TestFactory(TestCase):
         rc = smr.conditions["red"]
         self.assertTrue(isinstance(rc, AboveCondition))
         self.assertEquals(rc.value, 4)
+
+    def test_configure_linear(self):
+        class TestOptions(service.OptionsGlue):
+            optParameters = [["test", "t", "default", "help"]]
+            config_section = "statsd"
+
+        o = TestOptions()
+        config_file = ConfigParser.RawConfigParser()
+        config_file.readfp(StringIO("[statsd]\n\n[plugin_sli]\n"
+            "rules = \n"
+            "   test => red IF below 5 1\n"
+            "   test => green IF above 3 1\n"))
+        o.configure(config_file)
+        smf = SLIMetricFactory()
+        smf.configure(o)
+        smr = smf.build_metric("", "test")
+        rc = smr.conditions["red"]
+        self.assertTrue(isinstance(rc, BelowCondition))
+        self.assertEquals(rc.value, 5)
+        self.assertEquals(rc.slope, 1)
+        rc = smr.conditions["green"]
+        self.assertTrue(isinstance(rc, AboveCondition))
+        self.assertEquals(rc.value, 3)
+        self.assertEquals(rc.slope, 1)

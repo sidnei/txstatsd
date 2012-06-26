@@ -51,3 +51,4 @@ class ExtendedMetrics(Metrics):
                                  sample_rate)
             self._metrics[name] = metric
         self._metrics[name].mark(duration)
+

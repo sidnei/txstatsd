@@ -91,6 +91,12 @@ class TestMetrics(TestCase):
         self.assertEqual(self.connection.data,
                          'txstatsd.tests.users:pepe|pd')
 
+    def test_generic_extra(self):
+        """Test the GenericMetric class."""
+        self.metrics.report('users', "pepe", "pd", 100)
+        self.assertEqual(self.connection.data,
+                         'txstatsd.tests.users:pepe|pd|100')
+
     def test_empty_namespace(self):
         """Test reporting of an empty namespace."""
         self.metrics.namespace = None
@@ -118,3 +124,16 @@ class TestExtendedMetrics(TestMetrics):
         self.assertEqual(self.connection.data,
                          'txstatsd.tests.counter:9|c')
 
+    def test_sli(self):
+        """Test SLI call."""
+        self.metrics.sli('users', 100)
+        self.assertEqual(self.connection.data,
+                         'txstatsd.tests.users:100|sli')
+
+        self.metrics.sli('users', 200, 2)
+        self.assertEqual(self.connection.data,
+                         'txstatsd.tests.users:200|sli|2')
+
+        self.metrics.sli_error('users')
+        self.assertEqual(self.connection.data,
+                         'txstatsd.tests.users:error|sli')

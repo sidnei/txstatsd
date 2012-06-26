@@ -63,11 +63,11 @@ class SLIMetricFactory(object):
             cobj = method(*cparams.split(" "))
             self.config[head][label] = cobj
 
-    def build_above(self, value):
-        return AboveCondition(float(value))
+    def build_above(self, value, slope=0):
+        return AboveCondition(float(value), float(slope))
 
-    def build_below(self, value):
-        return BelowCondition(float(value))
+    def build_below(self, value, slope=0):
+        return BelowCondition(float(value), float(slope))
 
     def build_between(self, low, hi):
         return BetweenCondition(float(low), float(hi))
