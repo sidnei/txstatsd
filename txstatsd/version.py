@@ -1,1 +1,1 @@
-txstatsd = "0.7.0"
+txstatsd = "1.0.0"
