@@ -20,11 +20,15 @@
 # SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 """Tests for the various client classes."""
 
+import sys
 from twisted.internet import reactor
 from twisted.internet.defer import inlineCallbacks, Deferred
 from twisted.python import log
 from twisted.trial.unittest import TestCase
 
+import txstatsd.client
+import txstatsd.metrics.metric
+import txstatsd.metrics.metrics
 from txstatsd.metrics.metric import Metric
 from txstatsd.client import (
     StatsDClientProtocol, TwistedStatsDClient, UdpStatsDClient,
@@ -127,6 +131,29 @@ class TestClient(TestCase):
         # According to the python docs (and the source, I've checked)
         # setblocking(0) is the same as settimeout(0.0).
         self.assertEqual(client.socket.gettimeout(), 0.0)
+
+    def test_udp_client_can_be_imported_without_twisted(self):
+        """Ensure that the twisted-less client can be used without twisted."""
+        unloaded = [(name, mod) for (name, mod) in sys.modules.items()
+                    if 'twisted' in name]
+        def restore_modules():
+            for name, mod in unloaded:
+                sys.modules[name] = mod
+            reload(txstatsd.client)
+            reload(txstatsd.metrics.metrics)
+            reload(txstatsd.metrics.metric)
+        self.addCleanup(restore_modules)
+
+        # Mark everything twistedish as unavailable
+        for name, mod in unloaded:
+            sys.modules[name] = None
+
+        reload(txstatsd.client)
+        reload(txstatsd.metrics.metrics)
+        reload(txstatsd.metrics.metric)
+        for mod in sys.modules:
+            if 'twisted' in mod:
+                self.assertTrue(sys.modules[mod] is None)
 
 
 class TestConsistentHashingClient(TestCase):
