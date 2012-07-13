@@ -139,6 +139,9 @@ class TestClient(TestCase):
         def restore_modules():
             for name, mod in unloaded:
                 sys.modules[name] = mod
+            reload(txstatsd.client)
+            reload(txstatsd.metrics.metrics)
+            reload(txstatsd.metrics.metric)
         self.addCleanup(restore_modules)
 
         # Mark everything twistedish as unavailable
