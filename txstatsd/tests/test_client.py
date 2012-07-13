@@ -153,7 +153,7 @@ class TestClient(TestCase):
         reload(txstatsd.metrics.metric)
         for mod in sys.modules:
             if 'twisted' in mod:
-                self.assertIsNone(sys.modules[mod])
+                self.assertTrue(sys.modules[mod] is None)
 
 
 class TestConsistentHashingClient(TestCase):
