@@ -107,3 +107,13 @@ class ConsistentHashingClient(object):
         metric_name, rest = data.split(":", 1)
         client = self.ring.get_node(metric_name)
         client.write(data)
+
+    def connect(self):
+        """Connect all ring nodes."""
+        for node in self.ring.nodes:
+            node.connect()
+
+    def disconnect(self):
+        """Disconnect all ring nodes"""
+        for node in self.ring.nodes:
+            node.disconnect()

@@ -41,12 +41,20 @@ class FakeClient(object):
         self.host = host
         self.port = port
         self.data = []
+        self.connect_called = False
+        self.disconnect_called = False
 
     def __str__(self):
         return "%s:%d" % (self.host, self.port)
 
     def write(self, data):
         self.data.append(data)
+
+    def connect(self):
+        self.connect_called = True
+
+    def disconnect(self):
+        self.disconnect_called = True
 
 
 class TestClient(TestCase):
@@ -205,3 +213,23 @@ class TestConsistentHashingClient(TestCase):
         self.assertEqual(clients[0].data, ["bar:1"])
         self.assertEqual(clients[1].data, ["foo:1"])
         self.assertEqual(clients[2].data, ["dba:1"])
+
+    def test_connect_with_two_clients(self):
+        clients = [
+            FakeClient("127.0.0.1", 10001),
+            FakeClient("127.0.0.1", 10002),
+            ]
+        client = ConsistentHashingClient(clients)
+        client.connect()
+        self.assertTrue(clients[0].connect_called)
+        self.assertTrue(clients[1].connect_called)
+
+    def test_disconnect_with_two_clients(self):
+        clients = [
+            FakeClient("127.0.0.1", 10001),
+            FakeClient("127.0.0.1", 10002),
+            ]
+        client = ConsistentHashingClient(clients)
+        client.disconnect()
+        self.assertTrue(clients[0].disconnect_called)
+        self.assertTrue(clients[1].disconnect_called)
