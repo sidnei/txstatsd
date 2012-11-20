@@ -79,6 +79,21 @@ class Metrics(resource.Resource):
         return meth()
 
 
+class TimerResource(resource.Resource):
+    isLeaf = True
+
+    def __init__(self, reporter):
+        resource.Resource.__init__(self)
+        self.reporter = reporter
+
+    def render_GET(self, request):
+        result = dict(
+            histogram=self.reporter.histogram.histogram(),
+            max_value=self.reporter.max(),
+            min_value=self.reporter.min())
+        return json.dumps(result)
+
+
 def makeService(options, processor, statsd_service):
 
     if options["http-port"] is None:
