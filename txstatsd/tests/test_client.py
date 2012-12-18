@@ -69,7 +69,7 @@ class TestClient(TestCase):
             self.client.transport.stopListening()
         super(TestClient, self).tearDown()
 
-    def test_twistedstatsd_write_with_wellformed_address(self):
+    def test_twistedstatsd_write(self):
         self.client = TwistedStatsDClient('127.0.0.1', 8000)
         protocol = StatsDClientProtocol(self.client)
         reactor.listenUDP(0, protocol)
@@ -86,38 +86,56 @@ class TestClient(TestCase):
         return d
 
     @inlineCallbacks
-    def test_twistedstatsd_with_malformed_address_and_errback(self):
-        def ensure_exception_raised(ignore):
-            self.assertTrue(self.exception.startswith("DNS lookup failed"))
+    def test_twistedstatsd_write_with_host_resolved(self):
+        self.client = yield TwistedStatsDClient.create(
+            'localhost', 8000)
+        protocol = StatsDClientProtocol(self.client)
+        reactor.listenUDP(0, protocol)
 
-        def capture_exception_raised(failure):
-            self.exception = failure.getErrorMessage()
+        def ensure_bytes_sent(bytes_sent):
+            self.assertEqual(bytes_sent, len('message'))
+            self.assertEqual(self.client.host, '127.0.0.1')
 
-        yield TwistedStatsDClient(
-            '256.0.0.0', 1,
-            resolver_errback=capture_exception_raised)
+        def exercise(callback):
+            self.client.write('message', callback=callback)
 
         d = Deferred()
-        d.addCallback(ensure_exception_raised)
-        reactor.callLater(.5, d.callback, None)
+        d.addCallback(ensure_bytes_sent)
+        reactor.callWhenRunning(exercise, d.callback)
         yield d
 
     @inlineCallbacks
-    def test_twistedstatsd_with_malformed_address_and_no_errback(self):
-        def ensure_exception_raised(ignore):
-            self.assertTrue(self.exception.startswith("DNS lookup failed"))
+    def test_twistedstatsd_with_malformed_address_and_errback(self):
+        def ensure_exception_raised(exception):
+            self.assertTrue(exception.startswith("DNS lookup failed"))
 
         def capture_exception_raised(failure):
-            self.exception = failure.getErrorMessage()
+            exception = failure.getErrorMessage()
+            self.deferred_instance.callback(exception)
+
+        self.deferred_instance = TwistedStatsDClient.create(
+            '256.0.0.0', 1,
+            resolver_errback=capture_exception_raised)
+
+        self.deferred_instance.addCallback(ensure_exception_raised)
+        yield self.deferred_instance
+
+    @inlineCallbacks
+    def test_twistedstatsd_with_malformed_address_and_no_errback(self):
+        def ensure_exception_raised(exception):
+            self.assertTrue(exception.startswith("DNS lookup failed"))
+
+        def capture_exception_raised(failure):
+            exception = failure.getErrorMessage()
+            self.deferred_instance.callback(exception)
 
         self.patch(log, "err", capture_exception_raised)
 
-        yield TwistedStatsDClient('256.0.0.0', 1)
+        self.deferred_instance = TwistedStatsDClient.create(
+            '256.0.0.0', 1)
 
-        d = Deferred()
-        d.addCallback(ensure_exception_raised)
-        reactor.callLater(.5, d.callback, None)
-        yield d
+        self.deferred_instance.addCallback(ensure_exception_raised)
+        yield self.deferred_instance
 
     def test_udpstatsd_wellformed_address(self):
         client = UdpStatsDClient('localhost', 8000)
