@@ -86,6 +86,25 @@ class TestClient(TestCase):
         return d
 
     @inlineCallbacks
+    def test_twistedstatsd_write_with_host_resolved(self):
+        self.client = yield TwistedStatsDClient.create_after_resolving_host(
+            'localhost', 8000)
+        protocol = StatsDClientProtocol(self.client)
+        reactor.listenUDP(0, protocol)
+
+        def ensure_bytes_sent(bytes_sent):
+            self.assertEqual(bytes_sent, len('message'))
+            self.assertEqual(self.client.host, '127.0.0.1')
+
+        def exercise(callback):
+            self.client.write('message', callback=callback)
+
+        d = Deferred()
+        d.addCallback(ensure_bytes_sent)
+        reactor.callWhenRunning(exercise, d.callback)
+        yield d
+
+    @inlineCallbacks
     def test_twistedstatsd_with_malformed_address_and_errback(self):
         def ensure_exception_raised(ignore):
             self.assertTrue(self.exception.startswith("DNS lookup failed"))

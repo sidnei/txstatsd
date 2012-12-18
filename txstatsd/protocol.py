@@ -21,7 +21,7 @@
 
 import socket
 
-from twisted.internet.defer import inlineCallbacks, returnValue
+from twisted.internet.defer import inlineCallbacks, returnValue, Deferred
 from twisted.internet.protocol import DatagramProtocol
 from twisted.python import log
 
@@ -46,10 +46,8 @@ class StatsDClientProtocol(DatagramProtocol):
 
 class TwistedStatsDClient(object):
 
-    def __init__(self, host, port,
-                 connect_callback=None,
-                 disconnect_callback=None,
-                 resolver_errback=None):
+    def __init__(self, host, port, connect_callback=None,
+                 disconnect_callback=None, resolver_errback=None):
         """
         Build a connection that reports to the endpoint (on C{host} and
         C{port}) using UDP.
@@ -86,6 +84,39 @@ class TwistedStatsDClient(object):
 
     def __str__(self):
         return "%s:%d" % (self.original_host, self.port)
+
+    @staticmethod
+    def create_after_resolving_host(host, port, connect_callback=None,
+                                    disconnect_callback=None,
+                                    resolver_errback=None):
+        """Resolve the host and return a Deferred for the instance.
+
+        Build a connection that reports to the endpoint (on C{host} and
+        C{port}) using UDP.
+
+        @param host: The StatsD server host.
+        @param port: The StatsD server port.
+        @param resolver_errback: The errback to invoke should
+            issues occur resolving the supplied C{host}.
+        @param connect_callback: The callback to invoke on connection.
+        @param disconnect_callback: The callback to invoke on disconnection."""
+        from twisted.internet import reactor
+
+        deferred_instance = Deferred()
+
+        def create_instance(ip):
+            instance = TwistedStatsDClient(
+                host=ip, port=port, connect_callback=connect_callback,
+                disconnect_callback=disconnect_callback)
+            deferred_instance.callback(instance)
+
+        if resolver_errback is None:
+            resolver_errback = log.err
+
+        resolver = reactor.resolve(host)
+        resolver.addCallbacks(create_instance, resolver_errback)
+
+        return deferred_instance
 
     @inlineCallbacks
     def connect(self, transport=None):
