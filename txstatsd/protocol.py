@@ -75,9 +75,8 @@ class TwistedStatsDClient(object):
         return "%s:%d" % (self.host, self.port)
 
     @staticmethod
-    def create_after_resolving_host(host, port, connect_callback=None,
-                                    disconnect_callback=None,
-                                    resolver_errback=None):
+    def create(host, port, connect_callback=None, disconnect_callback=None,
+               resolver_errback=None):
         """Resolve the host and return a Deferred for the instance.
 
         Build a connection that reports to the endpoint (on C{host} and

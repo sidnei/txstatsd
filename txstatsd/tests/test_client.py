@@ -87,7 +87,7 @@ class TestClient(TestCase):
 
     @inlineCallbacks
     def test_twistedstatsd_write_with_host_resolved(self):
-        self.client = yield TwistedStatsDClient.create_after_resolving_host(
+        self.client = yield TwistedStatsDClient.create(
             'localhost', 8000)
         protocol = StatsDClientProtocol(self.client)
         reactor.listenUDP(0, protocol)
@@ -113,7 +113,7 @@ class TestClient(TestCase):
             exception = failure.getErrorMessage()
             self.deferred_instance.callback(exception)
 
-        self.deferred_instance = TwistedStatsDClient.create_after_resolving_host(
+        self.deferred_instance = TwistedStatsDClient.create(
             '256.0.0.0', 1,
             resolver_errback=capture_exception_raised)
 
@@ -131,7 +131,7 @@ class TestClient(TestCase):
 
         self.patch(log, "err", capture_exception_raised)
 
-        self.deferred_instance = TwistedStatsDClient.create_after_resolving_host(
+        self.deferred_instance = TwistedStatsDClient.create(
             '256.0.0.0', 1)
 
         self.deferred_instance.addCallback(ensure_exception_raised)
