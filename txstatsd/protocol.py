@@ -54,8 +54,8 @@ class TwistedStatsDClient(object):
 
         @param host: The StatsD server host.
         @param port: The StatsD server port.
-        @param resolver_errback: The errback to invoke should
-            issues occur resolving the supplied C{host}.
+        @param resolver_errback: Deprecated parameter, unused.
+            Please avoid using it.
         @param connect_callback: The callback to invoke on connection.
         @param disconnect_callback: The callback to invoke on disconnection.
         """
@@ -63,18 +63,7 @@ class TwistedStatsDClient(object):
 
         self.reactor = reactor
 
-        @inlineCallbacks
-        def resolve(host):
-            self.host = yield reactor.resolve(host)
-            returnValue(self.host)
-
-        self.original_host = host
-        self.host = None
-        self.resolver = resolve(host)
-        if resolver_errback is None:
-            self.resolver.addErrback(log.err)
-        else:
-            self.resolver.addErrback(resolver_errback)
+        self.host = host
 
         self.port = port
         self.connect_callback = connect_callback
@@ -83,7 +72,7 @@ class TwistedStatsDClient(object):
         self.transport = None
 
     def __str__(self):
-        return "%s:%d" % (self.original_host, self.port)
+        return "%s:%d" % (self.host, self.port)
 
     @staticmethod
     def create_after_resolving_host(host, port, connect_callback=None,
@@ -118,15 +107,12 @@ class TwistedStatsDClient(object):
 
         return deferred_instance
 
-    @inlineCallbacks
     def connect(self, transport=None):
         """Connect to the StatsD server."""
-        host = yield self.resolver
-        if host is not None:
+        if transport is not None:
             self.transport = transport
-            if self.transport is not None:
-                if self.connect_callback is not None:
-                    self.connect_callback()
+            if self.connect_callback is not None:
+                self.connect_callback()
 
     def disconnect(self):
         """Disconnect from the StatsD server."""

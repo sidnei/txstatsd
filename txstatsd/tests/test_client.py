@@ -69,7 +69,7 @@ class TestClient(TestCase):
             self.client.transport.stopListening()
         super(TestClient, self).tearDown()
 
-    def test_twistedstatsd_write_with_wellformed_address(self):
+    def test_twistedstatsd_write(self):
         self.client = TwistedStatsDClient('127.0.0.1', 8000)
         protocol = StatsDClientProtocol(self.client)
         reactor.listenUDP(0, protocol)
