@@ -56,16 +56,36 @@ class TransportGateway(object):
         self.transport = transport
         self.reactor = reactor
 
-    def write(self, data):
+    def write(self, data, callback):
         """Writes the data to the transport."""
+        self.reactor.callFromThread(self._write, data, callback)
+
+    def _write(self, data, callback):
+        """Send the metric to the StatsD server.
+
+        @param data: The data to be sent.
+        @param callback: The callback to which the result should be sent.
+        @raise twisted.internet.error.MessageLengthError: If the size of data
+            is too large.
+        """
+        try:
+            bytes_sent = self.transport.write(data)
+            if callback is not None:
+                callback(bytes_sent)
+        except (OverflowError, TypeError, socket.error, socket.gaierror):
+            if callback is not None:
+                callback(None)
 
 
 class TwistedStatsDClient(object):
 
     def __init__(self, host, port, connect_callback=None,
                  disconnect_callback=None):
-        """Don't use this initializer directly; Instead, use the create()
+        """Avoid using this initializer directly; Instead, use the create()
         static method, otherwise the messages won't be really delivered.
+
+        If you still need to use this directly and want to resolve the host
+        yourself, remember to call host_resolved() as soon as it's resolved.
 
         @param host: The StatsD server host.
         @param port: The StatsD server port.
@@ -138,24 +158,7 @@ class TwistedStatsDClient(object):
             B{Note}: The C{callback} will be called in the C{reactor}
             thread, and not in the thread of the original caller.
         """
-        self.reactor.callFromThread(self._write, data, callback)
-
-    def _write(self, data, callback):
-        """Send the metric to the StatsD server.
-
-        @param data: The data to be sent.
-        @param callback: The callback to which the result should be sent.
-        @raise twisted.internet.error.MessageLengthError: If the size of data
-            is too large.
-        """
-        if self.host is not None and self.transport is not None:
-            try:
-                bytes_sent = self.transport.write(data, (self.host, self.port))
-                if callback is not None:
-                    callback(bytes_sent)
-            except (OverflowError, TypeError, socket.error, socket.gaierror):
-                if callback is not None:
-                    callback(None)
+        return self.transport_gateway.write(data, callback)
 
     def host_resolved(self, ip):
         """Callback used when the host is resolved to an IP address."""

@@ -269,6 +269,23 @@ class TestClient(TestCase):
         with self.mocker:
             self.client.host_resolved('127.0.0.1')
 
+    def test_sends_messages_to_gateway_after_host_resolves(self):
+        """After the host is resolved, send messages to the
+        TransportGateway."""
+        self.client = TwistedStatsDClient('localhost', 8000)
+        self.build_protocol()
+        self.client.host_resolved('127.0.0.1')
+
+        message = 'some data'
+        bytes_sent = len(message)
+        self.client.transport_gateway = self.mocker.mock(spec=TransportGateway)
+        callback = self.mocker.mock()
+        expect(self.client.transport_gateway.write(message, callback)).result(
+            bytes_sent)
+
+        with self.mocker:
+            self.assertEqual(self.client.write(message, callback), bytes_sent)
+
 
 class TestConsistentHashingClient(TestCase):
 
