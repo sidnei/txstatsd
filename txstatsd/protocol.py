@@ -48,6 +48,9 @@ class DataQueue(object):
     """Manages the queue of sent data, so that it can be really sent later when
     the host is resolved."""
 
+    def write(self, data, callback):
+        """Queue the given data, so that it's sent later."""
+
 
 class TransportGateway(object):
     """Responsible for sending datagrams to the actual transport."""
@@ -158,7 +161,9 @@ class TwistedStatsDClient(object):
             B{Note}: The C{callback} will be called in the C{reactor}
             thread, and not in the thread of the original caller.
         """
-        return self.transport_gateway.write(data, callback)
+        if self.transport_gateway is not None:
+            return self.transport_gateway.write(data, callback)
+        return self.data_queue.write(data, callback)
 
     def host_resolved(self, ip):
         """Callback used when the host is resolved to an IP address."""

@@ -278,6 +278,7 @@ class TestClient(TestCase):
 
         message = 'some data'
         bytes_sent = len(message)
+        self.client.data_queue = self.mocker.mock(spec=DataQueue)  # not called
         self.client.transport_gateway = self.mocker.mock(spec=TransportGateway)
         callback = self.mocker.mock()
         expect(self.client.transport_gateway.write(message, callback)).result(
@@ -285,6 +286,20 @@ class TestClient(TestCase):
 
         with self.mocker:
             self.assertEqual(self.client.write(message, callback), bytes_sent)
+
+    def test_sends_messages_to_queue_before_host_resolves(self):
+        """Before the host is resolved, send messages to the DataQueue."""
+        self.client = TwistedStatsDClient('localhost', 8000)
+        self.build_protocol()
+
+        message = 'some data'
+        bytes_sent = len(message)
+        self.client.data_queue = self.mocker.mock(spec=DataQueue)
+        callback = self.mocker.mock()
+        expect(self.client.data_queue.write(message, callback)).result(None)
+
+        with self.mocker:
+            self.assertEqual(self.client.write(message, callback), None)
 
 
 class TestConsistentHashingClient(TestCase):
