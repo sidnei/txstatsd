@@ -63,15 +63,12 @@ class TransportGateway(object):
 class TwistedStatsDClient(object):
 
     def __init__(self, host, port, connect_callback=None,
-                 disconnect_callback=None, resolver_errback=None):
-        """
-        Build a connection that reports to the endpoint (on C{host} and
-        C{port}) using UDP.
+                 disconnect_callback=None):
+        """Don't use this initializer directly; Instead, use the create()
+        static method, otherwise the messages won't be really delivered.
 
         @param host: The StatsD server host.
         @param port: The StatsD server port.
-        @param resolver_errback: Deprecated parameter, unused.
-            Please avoid using it.
         @param connect_callback: The callback to invoke on connection.
         @param disconnect_callback: The callback to invoke on disconnection.
         """
@@ -94,7 +91,9 @@ class TwistedStatsDClient(object):
     @staticmethod
     def create(host, port, connect_callback=None, disconnect_callback=None,
                resolver_errback=None):
-        """Resolve the host and return a Deferred for the instance.
+        """Create an instance that resolves the host to an IP asynchronously.
+
+        Will queue all messages while the host is not yet resolved.
 
         Build a connection that reports to the endpoint (on C{host} and
         C{port}) using UDP.
@@ -107,21 +106,18 @@ class TwistedStatsDClient(object):
         @param disconnect_callback: The callback to invoke on disconnection."""
         from twisted.internet import reactor
 
-        deferred_instance = Deferred()
-
-        def create_instance(ip):
-            instance = TwistedStatsDClient(
-                host=ip, port=port, connect_callback=connect_callback,
-                disconnect_callback=disconnect_callback)
-            deferred_instance.callback(instance)
+        instance = TwistedStatsDClient(
+            host=host, port=port, connect_callback=connect_callback,
+            disconnect_callback=disconnect_callback)
 
         if resolver_errback is None:
             resolver_errback = log.err
 
-        resolver = reactor.resolve(host)
-        resolver.addCallbacks(create_instance, resolver_errback)
+        instance.resolve_later = reactor.resolve(host)
+        instance.resolve_later.addCallbacks(instance.host_resolved,
+                                            resolver_errback)
 
-        return deferred_instance
+        return instance
 
     def connect(self, transport=None):
         """Connect to the StatsD server."""
