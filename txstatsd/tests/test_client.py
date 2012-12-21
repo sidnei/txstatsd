@@ -21,6 +21,8 @@
 """Tests for the various client classes."""
 
 import sys
+
+from mocker import Mock
 from twisted.internet import reactor
 from twisted.internet.defer import inlineCallbacks, Deferred
 from twisted.python import log
@@ -32,7 +34,9 @@ import txstatsd.metrics.metrics
 from txstatsd.metrics.metric import Metric
 from txstatsd.client import (
     StatsDClientProtocol, TwistedStatsDClient, UdpStatsDClient,
-    ConsistentHashingClient)
+    ConsistentHashingClient
+)
+from txstatsd.protocol import DataQueue, TransportGateway
 
 
 class FakeClient(object):
@@ -68,6 +72,10 @@ class TestClient(TestCase):
         if self.client:
             self.client.transport.stopListening()
         super(TestClient, self).tearDown()
+
+    def build_protocol(self):
+        protocol = StatsDClientProtocol(self.client)
+        reactor.listenUDP(0, protocol)
 
     def test_twistedstatsd_write(self):
         self.client = TwistedStatsDClient('127.0.0.1', 8000)
@@ -180,6 +188,32 @@ class TestClient(TestCase):
         for mod in sys.modules:
             if 'twisted' in mod:
                 self.assertTrue(sys.modules[mod] is None)
+
+    def test_starts_with_data_queue(self):
+        """The client starts with a DataQueue."""
+        self.client = TwistedStatsDClient('127.0.0.1', 8000)
+        self.build_protocol()
+
+        self.assertIsInstance(self.client.data_queue, DataQueue)
+
+    def test_starts_with_transport_gateway(self):
+        """The client starts with a TransportGateway."""
+        self.client = TwistedStatsDClient('127.0.0.1', 8000)
+
+        self.assertTrue(self.client.transport_gateway is None)
+
+        self.build_protocol()
+
+        self.assertIsInstance(self.client.transport_gateway, TransportGateway)
+
+    def test_passes_transport_to_gateway(self):
+        """The client passes the transport to the gateway as soon as the client
+        is connected."""
+        self.client = TwistedStatsDClient('127.0.0.1', 8000)
+        self.build_protocol()
+
+        self.assertEqual(self.client.transport_gateway.transport,
+                         self.client.transport)
 
 
 class TestConsistentHashingClient(TestCase):

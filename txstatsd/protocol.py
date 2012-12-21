@@ -44,6 +44,18 @@ class StatsDClientProtocol(DatagramProtocol):
         self.client.disconnect()
 
 
+class DataQueue(object):
+    """Manages the queue of sent data, so that it can be really sent later when
+    the host is resolved."""
+
+
+class TransportGateway(object):
+    """Responsible for sending datagrams to the actual transport."""
+
+    def __init__(self, transport):
+        self.transport = transport
+
+
 class TwistedStatsDClient(object):
 
     def __init__(self, host, port, connect_callback=None,
@@ -64,12 +76,13 @@ class TwistedStatsDClient(object):
         self.reactor = reactor
 
         self.host = host
-
         self.port = port
         self.connect_callback = connect_callback
         self.disconnect_callback = disconnect_callback
+        self.data_queue = DataQueue()
 
         self.transport = None
+        self.transport_gateway = None
 
     def __str__(self):
         return "%s:%d" % (self.host, self.port)
@@ -110,6 +123,7 @@ class TwistedStatsDClient(object):
         """Connect to the StatsD server."""
         if transport is not None:
             self.transport = transport
+            self.transport_gateway = TransportGateway(transport)
             if self.connect_callback is not None:
                 self.connect_callback()
 
