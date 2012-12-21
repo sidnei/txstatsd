@@ -160,6 +160,7 @@ class TwistedStatsDClient(object):
     def host_resolved(self, ip):
         """Callback used when the host is resolved to an IP address."""
         self.host = ip
+        self.transport.connect(self.host, self.port)
         self.transport_gateway = TransportGateway(self.transport, self.reactor)
 
         if self.connect_callback is not None:
