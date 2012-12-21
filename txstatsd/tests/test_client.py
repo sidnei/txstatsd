@@ -197,21 +197,19 @@ class TestClient(TestCase):
 
         self.assertIsInstance(self.client.data_queue, DataQueue)
 
-    def test_starts_with_transport_gateway(self):
-        """The client starts with a TransportGateway."""
+    def test_starts_without_transport_gateway(self):
+        """The client starts without a TransportGateway."""
         self.client = TwistedStatsDClient('127.0.0.1', 8000)
-
-        self.assertTrue(self.client.transport_gateway is None)
-
         self.build_protocol()
 
-        self.assertIsInstance(self.client.transport_gateway, TransportGateway)
+        self.assertTrue(self.client.transport_gateway is None)
 
     def test_passes_transport_to_gateway(self):
         """The client passes the transport to the gateway as soon as the client
         is connected."""
         self.client = TwistedStatsDClient('127.0.0.1', 8000)
         self.build_protocol()
+        self.client.host_resolved('127.0.0.1')
 
         self.assertEqual(self.client.transport_gateway.transport,
                          self.client.transport)
@@ -221,9 +219,40 @@ class TestClient(TestCase):
         is connected."""
         self.client = TwistedStatsDClient('127.0.0.1', 8000)
         self.build_protocol()
+        self.client.host_resolved('127.0.0.1')
 
         self.assertEqual(self.client.transport_gateway.reactor,
                          self.client.reactor)
+
+    def test_sets_ip_when_host_resolves(self):
+        """As soon as the host is resolved, set the IP as the host."""
+        self.client = TwistedStatsDClient('localhost', 8000)
+        self.build_protocol()
+        self.assertEqual(self.client.host, 'localhost')
+
+        self.client.host_resolved('127.0.0.1')
+        self.assertEqual(self.client.host, '127.0.0.1')
+
+    def test_sets_transport_gateway_when_host_resolves(self):
+        """As soon as the host is resolved, set the transport gateway."""
+        self.client = TwistedStatsDClient('localhost', 8000)
+        self.build_protocol()
+
+        self.client.transport_gateway = None
+
+        self.client.host_resolved('127.0.0.1')
+        self.assertIsInstance(self.client.transport_gateway, TransportGateway)
+
+    def test_calls_connect_callback_when_host_resolves(self):
+        """As soon as the host is resolved, call back the connect_callback."""
+        self.client = TwistedStatsDClient('localhost', 8000)
+        self.build_protocol()
+
+        self.client.connect_callback = self.mocker.mock()
+        expect(self.client.connect_callback())
+
+        with self.mocker:
+            self.client.host_resolved('127.0.0.1')
 
 
 class TestConsistentHashingClient(TestCase):

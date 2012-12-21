@@ -127,9 +127,6 @@ class TwistedStatsDClient(object):
         """Connect to the StatsD server."""
         if transport is not None:
             self.transport = transport
-            self.transport_gateway = TransportGateway(transport, self.reactor)
-            if self.connect_callback is not None:
-                self.connect_callback()
 
     def disconnect(self):
         """Disconnect from the StatsD server."""
@@ -163,3 +160,11 @@ class TwistedStatsDClient(object):
             except (OverflowError, TypeError, socket.error, socket.gaierror):
                 if callback is not None:
                     callback(None)
+
+    def host_resolved(self, ip):
+        """Callback used when the host is resolved to an IP address."""
+        self.host = ip
+        self.transport_gateway = TransportGateway(self.transport, self.reactor)
+
+        if self.connect_callback is not None:
+            self.connect_callback()
