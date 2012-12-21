@@ -330,6 +330,25 @@ class DataQueueTest(TestCase):
         self.queue.flush()
         self.assertEqual(self.queue.flush(), [])
 
+    def test_limits_number_of_messages(self):
+        """Cannot save more messages than the defined limit."""
+
+        for i in range(DataQueue.LIMIT):
+            self.queue.write('saved data', 'saved callback')
+        self.queue.write('discarded data', 'discarded message')
+
+        self.assertEqual(len(self.queue.flush()), DataQueue.LIMIT)
+
+    def test_discards_messages_after_limit(self):
+        """Cannot save more messages than the defined limit."""
+
+        for i in range(DataQueue.LIMIT):
+            self.queue.write('saved data', 'saved callback')
+        self.queue.write('discarded data', 'discarded message')
+
+        self.assertEqual(set(self.queue.flush()),
+                         set([('saved data', 'saved callback')]))
+
 
 class TestConsistentHashingClient(TestCase):
 
