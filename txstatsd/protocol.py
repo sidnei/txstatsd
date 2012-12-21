@@ -52,8 +52,12 @@ class DataQueue(object):
 class TransportGateway(object):
     """Responsible for sending datagrams to the actual transport."""
 
-    def __init__(self, transport):
+    def __init__(self, transport, reactor):
         self.transport = transport
+        self.reactor = reactor
+
+    def write(self, data):
+        """Writes the data to the transport."""
 
 
 class TwistedStatsDClient(object):
@@ -123,7 +127,7 @@ class TwistedStatsDClient(object):
         """Connect to the StatsD server."""
         if transport is not None:
             self.transport = transport
-            self.transport_gateway = TransportGateway(transport)
+            self.transport_gateway = TransportGateway(transport, self.reactor)
             if self.connect_callback is not None:
                 self.connect_callback()
 

@@ -22,7 +22,7 @@
 
 import sys
 
-from mocker import Mock
+from mocker import Mocker, expect
 from twisted.internet import reactor
 from twisted.internet.defer import inlineCallbacks, Deferred
 from twisted.python import log
@@ -67,6 +67,7 @@ class TestClient(TestCase):
         super(TestClient, self).setUp()
         self.client = None
         self.exception = None
+        self.mocker = Mocker()
 
     def tearDown(self):
         if self.client:
@@ -214,6 +215,15 @@ class TestClient(TestCase):
 
         self.assertEqual(self.client.transport_gateway.transport,
                          self.client.transport)
+
+    def test_passes_reactor_to_gateway(self):
+        """The client passes the reactor to the gateway as soon as the client
+        is connected."""
+        self.client = TwistedStatsDClient('127.0.0.1', 8000)
+        self.build_protocol()
+
+        self.assertEqual(self.client.transport_gateway.reactor,
+                         self.client.reactor)
 
 
 class TestConsistentHashingClient(TestCase):
