@@ -302,6 +302,35 @@ class TestClient(TestCase):
             self.assertEqual(self.client.write(message, callback), None)
 
 
+class DataQueueTest(TestCase):
+    """Tests for the DataQueue class."""
+
+    def setUp(self):
+        super(DataQueueTest, self).setUp()
+        self.queue = DataQueue()
+
+    def test_queues_messages_and_callbacks(self):
+        """All messages are queued with their respective callbacks."""
+        self.queue.write(data=1, callback='1')
+        self.queue.write(data=2, callback='2')
+        self.queue.write(data=3, callback='3')
+
+        self.assertEqual(self.queue.flush(), [
+            (1, '1'),
+            (2, '2'),
+            (3, '3'),
+        ])
+
+    def test_flushes_the_queue(self):
+        """All messages are queued with their respective callbacks."""
+        self.queue.write(data=1, callback='1')
+        self.queue.write(data=2, callback='2')
+        self.queue.write(data=3, callback='3')
+
+        self.queue.flush()
+        self.assertEqual(self.queue.flush(), [])
+
+
 class TestConsistentHashingClient(TestCase):
 
     def test_hash_with_single_client(self):
