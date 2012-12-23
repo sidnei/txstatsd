@@ -26,6 +26,9 @@ from twisted.internet.protocol import DatagramProtocol
 from twisted.python import log
 
 
+__all__ = ('StatsDClientProtocol', 'TwistedStatsDClient')
+
+
 class StatsDClientProtocol(DatagramProtocol):
     """A Twisted-based implementation of the StatsD client protocol.
 
@@ -54,7 +57,11 @@ class DataQueue(object):
         self._queue = []
 
     def write(self, data, callback):
-        """Queue the given data, so that it's sent later."""
+        """Queue the given data, so that it's sent later.
+
+        @param data: The data to be queued.
+        @param callback: The callback to use when the data is flushed.
+        """
         if len(self._queue) < self.LIMIT:
             self._queue.append((data, callback))
 
@@ -69,11 +76,21 @@ class TransportGateway(object):
     """Responsible for sending datagrams to the actual transport."""
 
     def __init__(self, transport, reactor):
+        """
+        @param transport: DatagramProtocol().transport .
+        @param reactor: The Twisted reactor in use.
+        """
         self.transport = transport
         self.reactor = reactor
 
     def write(self, data, callback):
-        """Writes the data to the transport."""
+        """Send the metric to the StatsD server.
+
+        @param data: The data to be sent.
+        @param callback: The callback to which the result should be sent.
+            B{Note}: The C{callback} will be called in the C{reactor}
+            thread, and not in the thread of the original caller.
+        """
         self.reactor.callFromThread(self._write, data, callback)
 
     def _write(self, data, callback):
