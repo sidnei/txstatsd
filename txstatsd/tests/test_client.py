@@ -22,7 +22,7 @@
 
 import sys
 
-from mocker import Mocker, expect
+from mocker import Mocker, expect, ANY
 from twisted.internet import reactor
 from twisted.internet.defer import inlineCallbacks, Deferred
 from twisted.python import log
@@ -300,6 +300,25 @@ class TestClient(TestCase):
 
         with self.mocker:
             self.assertEqual(self.client.write(message, callback), None)
+
+    def test_flushes_queued_messages_to_the_gateway_when_host_resolves(self):
+        """As soon as the host is resolved, flush all messages to the
+        TransportGateway."""
+        self.client = TwistedStatsDClient('localhost', 8000)
+        self.build_protocol()
+
+        self.client.data_queue.write('data 1', 'callback 1')
+        self.client.data_queue.write('data 2', 'callback 2')
+        self.client.data_queue.write('data 3', 'callback 3')
+
+        mock_gateway_write = self.mocker.mock()
+        self.patch(TransportGateway, 'write', mock_gateway_write)
+        expect(mock_gateway_write('data 1', 'callback 1'))
+        expect(mock_gateway_write('data 2', 'callback 2'))
+        expect(mock_gateway_write('data 3', 'callback 3'))
+
+        with self.mocker:
+            self.client.host_resolved('127.0.0.1')
 
 
 class DataQueueTest(TestCase):

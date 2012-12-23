@@ -186,3 +186,12 @@ class TwistedStatsDClient(object):
 
         if self.connect_callback is not None:
             self.connect_callback()
+
+        self._flush_items()
+
+    def _flush_items(self):
+        """Flush all items (data, callback) from the DataQueue to the
+        TransportGateway."""
+        for item in self.data_queue.flush():
+            data, callback = item
+            self.transport_gateway.write(data, callback)
