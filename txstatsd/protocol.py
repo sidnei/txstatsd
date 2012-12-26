@@ -51,9 +51,8 @@ class DataQueue(object):
     """Manages the queue of sent data, so that it can be really sent later when
     the host is resolved."""
 
-    LIMIT = 1000
-
-    def __init__(self):
+    def __init__(self, limit=1000):
+        self._limit = limit
         self._queue = []
 
     def write(self, data, callback):
@@ -62,7 +61,7 @@ class DataQueue(object):
         @param data: The data to be queued.
         @param callback: The callback to use when the data is flushed.
         """
-        if len(self._queue) < self.LIMIT:
+        if len(self._queue) < self._limit:
             self._queue.append((data, callback))
 
     def flush(self):
