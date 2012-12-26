@@ -326,34 +326,28 @@ class DataQueueTest(TestCase):
 
     def setUp(self):
         super(DataQueueTest, self).setUp()
-        self.queue = DataQueue()
+        self.queue = DataQueue(limit=2)
 
     def test_queues_messages_and_callbacks(self):
         """All messages are queued with their respective callbacks."""
         self.queue.write(data=1, callback='1')
         self.queue.write(data=2, callback='2')
-        self.queue.write(data=3, callback='3')
 
         self.assertEqual(self.queue.flush(), [
             (1, '1'),
             (2, '2'),
-            (3, '3'),
         ])
 
     def test_flushes_the_queue(self):
         """All messages are queued with their respective callbacks."""
         self.queue.write(data=1, callback='1')
         self.queue.write(data=2, callback='2')
-        self.queue.write(data=3, callback='3')
 
         self.queue.flush()
         self.assertEqual(self.queue.flush(), [])
 
     def test_limits_number_of_messages(self):
         """Cannot save more messages than the defined limit."""
-
-        self.queue = DataQueue(limit=2)
-
         self.queue.write('saved data', 'saved callback')
         self.queue.write('saved data', 'saved callback')
         self.queue.write('discarded data', 'discarded message')
@@ -362,15 +356,18 @@ class DataQueueTest(TestCase):
 
     def test_discards_messages_after_limit(self):
         """Cannot save more messages than the defined limit."""
-
-        self.queue = DataQueue(limit=2)
-
         self.queue.write('saved data', 'saved callback')
         self.queue.write('saved data', 'saved callback')
         self.queue.write('discarded data', 'discarded message')
 
         self.assertEqual(set(self.queue.flush()),
                          set([('saved data', 'saved callback')]))
+
+    def test_makes_limit_optional(self):
+        """Use the default limit when not given."""
+        queue = DataQueue()
+
+        self.assertTrue(queue._limit > 0)
 
 
 class TestConsistentHashingClient(TestCase):
