@@ -256,19 +256,6 @@ class TestClient(TestCase):
         with self.mocker:
             self.client.host_resolved('127.0.0.1')
 
-    def test_connects_to_host_and_port_when_host_resolves(self):
-        """As soon as the host is resolved, "connect" to host and port (so that
-        the writes don't need to specify them)."""
-        self.client = TwistedStatsDClient('localhost', 8000)
-        self.build_protocol()
-
-        mock_connect = self.mocker.mock()
-        self.patch(self.client.transport, 'connect', mock_connect)
-        expect(mock_connect('127.0.0.1', 8000))
-
-        with self.mocker:
-            self.client.host_resolved('127.0.0.1')
-
     def test_sends_messages_to_gateway_after_host_resolves(self):
         """After the host is resolved, send messages to the
         TransportGateway."""

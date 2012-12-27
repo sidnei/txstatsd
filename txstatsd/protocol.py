@@ -74,13 +74,15 @@ class DataQueue(object):
 class TransportGateway(object):
     """Responsible for sending datagrams to the actual transport."""
 
-    def __init__(self, transport, reactor):
+    def __init__(self, transport, reactor, host, port):
         """
         @param transport: DatagramProtocol().transport .
         @param reactor: The Twisted reactor in use.
         """
         self.transport = transport
         self.reactor = reactor
+        self.host = host
+        self.port = port
 
     def write(self, data, callback):
         """Send the metric to the StatsD server.
@@ -101,7 +103,7 @@ class TransportGateway(object):
             is too large.
         """
         try:
-            bytes_sent = self.transport.write(data)
+            bytes_sent = self.transport.write(data, (self.host, self.port))
             if callback is not None:
                 callback(bytes_sent)
         except (OverflowError, TypeError, socket.error, socket.gaierror):
@@ -197,8 +199,8 @@ class TwistedStatsDClient(object):
     def host_resolved(self, ip):
         """Callback used when the host is resolved to an IP address."""
         self.host = ip
-        self.transport.connect(self.host, self.port)
-        self.transport_gateway = TransportGateway(self.transport, self.reactor)
+        self.transport_gateway = TransportGateway(self.transport, self.reactor,
+                                                  self.host, self.port)
 
         if self.connect_callback is not None:
             self.connect_callback()
