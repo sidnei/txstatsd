@@ -177,6 +177,9 @@ class TwistedStatsDClient(object):
         """Connect to the StatsD server."""
         if transport is not None:
             self.transport = transport
+            if self.transport_gateway is not None:
+                self.transport_gateway.transport = transport
+        self._flush_items()
 
     def disconnect(self):
         """Disconnect from the StatsD server."""
@@ -192,7 +195,7 @@ class TwistedStatsDClient(object):
             B{Note}: The C{callback} will be called in the C{reactor}
             thread, and not in the thread of the original caller.
         """
-        if self.transport_gateway is not None:
+        if self.transport_gateway is not None and self.transport is not None:
             return self.transport_gateway.write(data, callback)
         return self.data_queue.write(data, callback)
 
@@ -212,4 +215,4 @@ class TwistedStatsDClient(object):
         TransportGateway."""
         for item in self.data_queue.flush():
             data, callback = item
-            self.transport_gateway.write(data, callback)
+            self.write(data, callback)

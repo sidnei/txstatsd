@@ -264,7 +264,7 @@ class Router(BaseMessageProcessor):
         d = defer.Deferred()
         self.ready.addCallback(lambda _: d)
 
-        client = TwistedStatsDClient(
+        client = TwistedStatsDClient.create(
             host, port, connect_callback=lambda: d.callback(None))
         protocol = StatsDClientProtocol(client)
 

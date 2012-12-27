@@ -307,6 +307,23 @@ class TestClient(TestCase):
         with self.mocker:
             self.client.host_resolved('127.0.0.1')
 
+    def test_sets_client_transport_when_connected(self):
+        """Set the transport as an attribute of the client."""
+        self.client = TwistedStatsDClient('localhost', 8000)
+        transport = DummyTransport()
+        self.client.connect(transport)
+
+        self.assertEqual(self.client.transport, transport)
+
+    def test_sets_gateway_transport_when_connected(self):
+        """Set the transport as an attribute of the TransportGateway."""
+        self.client = TwistedStatsDClient('localhost', 8000)
+        self.client.host_resolved('127.0.0.1')
+        transport = DummyTransport()
+        self.client.connect(transport)
+
+        self.assertEqual(self.client.transport_gateway.transport, transport)
+
 
 class DataQueueTest(TestCase):
     """Tests for the DataQueue class."""
@@ -426,3 +443,8 @@ class TestConsistentHashingClient(TestCase):
         client.disconnect()
         self.assertTrue(clients[0].disconnect_called)
         self.assertTrue(clients[1].disconnect_called)
+
+
+class DummyTransport(object):
+    def stopListening(self):
+        pass
