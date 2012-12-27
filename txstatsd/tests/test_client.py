@@ -21,6 +21,8 @@
 """Tests for the various client classes."""
 
 import sys
+
+from mocker import Mocker, expect, ANY
 from twisted.internet import reactor
 from twisted.internet.defer import inlineCallbacks, Deferred
 from twisted.python import log
@@ -32,7 +34,9 @@ import txstatsd.metrics.metrics
 from txstatsd.metrics.metric import Metric
 from txstatsd.client import (
     StatsDClientProtocol, TwistedStatsDClient, UdpStatsDClient,
-    ConsistentHashingClient)
+    ConsistentHashingClient
+)
+from txstatsd.protocol import DataQueue, TransportGateway
 
 
 class FakeClient(object):
@@ -63,16 +67,21 @@ class TestClient(TestCase):
         super(TestClient, self).setUp()
         self.client = None
         self.exception = None
+        self.mocker = Mocker()
 
     def tearDown(self):
         if self.client:
             self.client.transport.stopListening()
         super(TestClient, self).tearDown()
 
-    def test_twistedstatsd_write(self):
-        self.client = TwistedStatsDClient('127.0.0.1', 8000)
+    def build_protocol(self):
         protocol = StatsDClientProtocol(self.client)
         reactor.listenUDP(0, protocol)
+
+    def test_twistedstatsd_write(self):
+        self.client = TwistedStatsDClient('127.0.0.1', 8000)
+        self.build_protocol()
+        self.client.host_resolved('127.0.0.1')
 
         def ensure_bytes_sent(bytes_sent):
             self.assertEqual(bytes_sent, len('message'))
@@ -87,10 +96,10 @@ class TestClient(TestCase):
 
     @inlineCallbacks
     def test_twistedstatsd_write_with_host_resolved(self):
-        self.client = yield TwistedStatsDClient.create(
+        self.client = TwistedStatsDClient.create(
             'localhost', 8000)
-        protocol = StatsDClientProtocol(self.client)
-        reactor.listenUDP(0, protocol)
+        self.build_protocol()
+        yield self.client.resolve_later
 
         def ensure_bytes_sent(bytes_sent):
             self.assertEqual(bytes_sent, len('message'))
@@ -106,36 +115,38 @@ class TestClient(TestCase):
 
     @inlineCallbacks
     def test_twistedstatsd_with_malformed_address_and_errback(self):
-        def ensure_exception_raised(exception):
-            self.assertTrue(exception.startswith("DNS lookup failed"))
+        exceptions_captured = []
 
         def capture_exception_raised(failure):
             exception = failure.getErrorMessage()
-            self.deferred_instance.callback(exception)
+            self.assertTrue(exception.startswith("DNS lookup failed"))
+            exceptions_captured.append(exception)
 
-        self.deferred_instance = TwistedStatsDClient.create(
+        self.client = TwistedStatsDClient.create(
             '256.0.0.0', 1,
             resolver_errback=capture_exception_raised)
+        self.build_protocol()
+        yield self.client.resolve_later
 
-        self.deferred_instance.addCallback(ensure_exception_raised)
-        yield self.deferred_instance
+        self.assertEqual(len(exceptions_captured), 1)
 
     @inlineCallbacks
     def test_twistedstatsd_with_malformed_address_and_no_errback(self):
-        def ensure_exception_raised(exception):
-            self.assertTrue(exception.startswith("DNS lookup failed"))
+        exceptions_captured = []
 
         def capture_exception_raised(failure):
             exception = failure.getErrorMessage()
-            self.deferred_instance.callback(exception)
+            self.assertTrue(exception.startswith("DNS lookup failed"))
+            exceptions_captured.append(exception)
 
         self.patch(log, "err", capture_exception_raised)
 
-        self.deferred_instance = TwistedStatsDClient.create(
+        self.client = TwistedStatsDClient.create(
             '256.0.0.0', 1)
+        self.build_protocol()
+        yield self.client.resolve_later
 
-        self.deferred_instance.addCallback(ensure_exception_raised)
-        yield self.deferred_instance
+        self.assertEqual(len(exceptions_captured), 1)
 
     def test_udpstatsd_wellformed_address(self):
         client = UdpStatsDClient('localhost', 8000)
@@ -180,6 +191,187 @@ class TestClient(TestCase):
         for mod in sys.modules:
             if 'twisted' in mod:
                 self.assertTrue(sys.modules[mod] is None)
+
+    def test_starts_with_data_queue(self):
+        """The client starts with a DataQueue."""
+        self.client = TwistedStatsDClient('127.0.0.1', 8000)
+        self.build_protocol()
+
+        self.assertIsInstance(self.client.data_queue, DataQueue)
+
+    def test_starts_without_transport_gateway(self):
+        """The client starts without a TransportGateway."""
+        self.client = TwistedStatsDClient('127.0.0.1', 8000)
+        self.build_protocol()
+
+        self.assertTrue(self.client.transport_gateway is None)
+
+    def test_passes_transport_to_gateway(self):
+        """The client passes the transport to the gateway as soon as the client
+        is connected."""
+        self.client = TwistedStatsDClient('127.0.0.1', 8000)
+        self.build_protocol()
+        self.client.host_resolved('127.0.0.1')
+
+        self.assertEqual(self.client.transport_gateway.transport,
+                         self.client.transport)
+
+    def test_passes_reactor_to_gateway(self):
+        """The client passes the reactor to the gateway as soon as the client
+        is connected."""
+        self.client = TwistedStatsDClient('127.0.0.1', 8000)
+        self.build_protocol()
+        self.client.host_resolved('127.0.0.1')
+
+        self.assertEqual(self.client.transport_gateway.reactor,
+                         self.client.reactor)
+
+    def test_sets_ip_when_host_resolves(self):
+        """As soon as the host is resolved, set the IP as the host."""
+        self.client = TwistedStatsDClient('localhost', 8000)
+        self.build_protocol()
+        self.assertEqual(self.client.host, 'localhost')
+
+        self.client.host_resolved('127.0.0.1')
+        self.assertEqual(self.client.host, '127.0.0.1')
+
+    def test_sets_transport_gateway_when_host_resolves(self):
+        """As soon as the host is resolved, set the transport gateway."""
+        self.client = TwistedStatsDClient('localhost', 8000)
+        self.build_protocol()
+
+        self.client.transport_gateway = None
+
+        self.client.host_resolved('127.0.0.1')
+        self.assertIsInstance(self.client.transport_gateway, TransportGateway)
+
+    def test_calls_connect_callback_when_host_resolves(self):
+        """As soon as the host is resolved, call back the connect_callback."""
+        self.client = TwistedStatsDClient('localhost', 8000)
+        self.build_protocol()
+
+        self.client.connect_callback = self.mocker.mock()
+        expect(self.client.connect_callback())
+
+        with self.mocker:
+            self.client.host_resolved('127.0.0.1')
+
+    def test_sends_messages_to_gateway_after_host_resolves(self):
+        """After the host is resolved, send messages to the
+        TransportGateway."""
+        self.client = TwistedStatsDClient('localhost', 8000)
+        self.build_protocol()
+        self.client.host_resolved('127.0.0.1')
+
+        message = 'some data'
+        bytes_sent = len(message)
+        self.client.data_queue = self.mocker.mock(spec=DataQueue)  # not called
+        self.client.transport_gateway = self.mocker.mock(spec=TransportGateway)
+        callback = self.mocker.mock()
+        expect(self.client.transport_gateway.write(message, callback)).result(
+            bytes_sent)
+
+        with self.mocker:
+            self.assertEqual(self.client.write(message, callback), bytes_sent)
+
+    def test_sends_messages_to_queue_before_host_resolves(self):
+        """Before the host is resolved, send messages to the DataQueue."""
+        self.client = TwistedStatsDClient('localhost', 8000)
+        self.build_protocol()
+
+        message = 'some data'
+        bytes_sent = len(message)
+        self.client.data_queue = self.mocker.mock(spec=DataQueue)
+        callback = self.mocker.mock()
+        expect(self.client.data_queue.write(message, callback)).result(None)
+
+        with self.mocker:
+            self.assertEqual(self.client.write(message, callback), None)
+
+    def test_flushes_queued_messages_to_the_gateway_when_host_resolves(self):
+        """As soon as the host is resolved, flush all messages to the
+        TransportGateway."""
+        self.client = TwistedStatsDClient('localhost', 8000)
+        self.build_protocol()
+
+        self.client.data_queue.write('data 1', 'callback 1')
+        self.client.data_queue.write('data 2', 'callback 2')
+        self.client.data_queue.write('data 3', 'callback 3')
+
+        mock_gateway_write = self.mocker.mock()
+        self.patch(TransportGateway, 'write', mock_gateway_write)
+        expect(mock_gateway_write('data 1', 'callback 1'))
+        expect(mock_gateway_write('data 2', 'callback 2'))
+        expect(mock_gateway_write('data 3', 'callback 3'))
+
+        with self.mocker:
+            self.client.host_resolved('127.0.0.1')
+
+    def test_sets_client_transport_when_connected(self):
+        """Set the transport as an attribute of the client."""
+        self.client = TwistedStatsDClient('localhost', 8000)
+        transport = DummyTransport()
+        self.client.connect(transport)
+
+        self.assertEqual(self.client.transport, transport)
+
+    def test_sets_gateway_transport_when_connected(self):
+        """Set the transport as an attribute of the TransportGateway."""
+        self.client = TwistedStatsDClient('localhost', 8000)
+        self.client.host_resolved('127.0.0.1')
+        transport = DummyTransport()
+        self.client.connect(transport)
+
+        self.assertEqual(self.client.transport_gateway.transport, transport)
+
+
+class DataQueueTest(TestCase):
+    """Tests for the DataQueue class."""
+
+    def setUp(self):
+        super(DataQueueTest, self).setUp()
+        self.queue = DataQueue(limit=2)
+
+    def test_queues_messages_and_callbacks(self):
+        """All messages are queued with their respective callbacks."""
+        self.queue.write(data=1, callback='1')
+        self.queue.write(data=2, callback='2')
+
+        self.assertEqual(self.queue.flush(), [
+            (1, '1'),
+            (2, '2'),
+        ])
+
+    def test_flushes_the_queue(self):
+        """All messages are queued with their respective callbacks."""
+        self.queue.write(data=1, callback='1')
+        self.queue.write(data=2, callback='2')
+
+        self.queue.flush()
+        self.assertEqual(self.queue.flush(), [])
+
+    def test_limits_number_of_messages(self):
+        """Cannot save more messages than the defined limit."""
+        self.queue.write('saved data', 'saved callback')
+        self.queue.write('saved data', 'saved callback')
+        self.queue.write('discarded data', 'discarded message')
+
+        self.assertEqual(len(self.queue.flush()), 2)
+
+    def test_discards_messages_after_limit(self):
+        """Cannot save more messages than the defined limit."""
+        self.queue.write('saved data', 'saved callback')
+        self.queue.write('saved data', 'saved callback')
+        self.queue.write('discarded data', 'discarded message')
+
+        self.assertEqual(set(self.queue.flush()),
+                         set([('saved data', 'saved callback')]))
+
+    def test_makes_limit_optional(self):
+        """Use the default limit when not given."""
+        queue = DataQueue()
+
+        self.assertTrue(queue._limit > 0)
 
 
 class TestConsistentHashingClient(TestCase):
@@ -251,3 +443,8 @@ class TestConsistentHashingClient(TestCase):
         client.disconnect()
         self.assertTrue(clients[0].disconnect_called)
         self.assertTrue(clients[1].disconnect_called)
+
+
+class DummyTransport(object):
+    def stopListening(self):
+        pass

@@ -26,6 +26,9 @@ from twisted.internet.protocol import DatagramProtocol
 from twisted.python import log
 
 
+__all__ = ('StatsDClientProtocol', 'TwistedStatsDClient')
+
+
 class StatsDClientProtocol(DatagramProtocol):
     """A Twisted-based implementation of the StatsD client protocol.
 
@@ -44,82 +47,44 @@ class StatsDClientProtocol(DatagramProtocol):
         self.client.disconnect()
 
 
-class TwistedStatsDClient(object):
+class DataQueue(object):
+    """Manages the queue of sent data, so that it can be really sent later when
+    the host is resolved."""
 
-    def __init__(self, host, port, connect_callback=None,
-                 disconnect_callback=None, resolver_errback=None):
+    def __init__(self, limit=1000):
+        self._limit = limit
+        self._queue = []
+
+    def write(self, data, callback):
+        """Queue the given data, so that it's sent later.
+
+        @param data: The data to be queued.
+        @param callback: The callback to use when the data is flushed.
         """
-        Build a connection that reports to the endpoint (on C{host} and
-        C{port}) using UDP.
+        if len(self._queue) < self._limit:
+            self._queue.append((data, callback))
 
-        @param host: The StatsD server host.
-        @param port: The StatsD server port.
-        @param resolver_errback: Deprecated parameter, unused.
-            Please avoid using it.
-        @param connect_callback: The callback to invoke on connection.
-        @param disconnect_callback: The callback to invoke on disconnection.
+    def flush(self):
+        """Flush the queue, returning its items."""
+        items = self._queue
+        self._queue = []
+        return items
+
+
+class TransportGateway(object):
+    """Responsible for sending datagrams to the actual transport."""
+
+    def __init__(self, transport, reactor, host, port):
         """
-        from twisted.internet import reactor
-
+        @param transport: DatagramProtocol().transport .
+        @param reactor: The Twisted reactor in use.
+        """
+        self.transport = transport
         self.reactor = reactor
-
         self.host = host
-
         self.port = port
-        self.connect_callback = connect_callback
-        self.disconnect_callback = disconnect_callback
 
-        self.transport = None
-
-    def __str__(self):
-        return "%s:%d" % (self.host, self.port)
-
-    @staticmethod
-    def create(host, port, connect_callback=None, disconnect_callback=None,
-               resolver_errback=None):
-        """Resolve the host and return a Deferred for the instance.
-
-        Build a connection that reports to the endpoint (on C{host} and
-        C{port}) using UDP.
-
-        @param host: The StatsD server host.
-        @param port: The StatsD server port.
-        @param resolver_errback: The errback to invoke should
-            issues occur resolving the supplied C{host}.
-        @param connect_callback: The callback to invoke on connection.
-        @param disconnect_callback: The callback to invoke on disconnection."""
-        from twisted.internet import reactor
-
-        deferred_instance = Deferred()
-
-        def create_instance(ip):
-            instance = TwistedStatsDClient(
-                host=ip, port=port, connect_callback=connect_callback,
-                disconnect_callback=disconnect_callback)
-            deferred_instance.callback(instance)
-
-        if resolver_errback is None:
-            resolver_errback = log.err
-
-        resolver = reactor.resolve(host)
-        resolver.addCallbacks(create_instance, resolver_errback)
-
-        return deferred_instance
-
-    def connect(self, transport=None):
-        """Connect to the StatsD server."""
-        if transport is not None:
-            self.transport = transport
-            if self.connect_callback is not None:
-                self.connect_callback()
-
-    def disconnect(self):
-        """Disconnect from the StatsD server."""
-        if self.disconnect_callback is not None:
-            self.disconnect_callback()
-        self.transport = None
-
-    def write(self, data, callback=None):
+    def write(self, data, callback):
         """Send the metric to the StatsD server.
 
         @param data: The data to be sent.
@@ -137,11 +102,117 @@ class TwistedStatsDClient(object):
         @raise twisted.internet.error.MessageLengthError: If the size of data
             is too large.
         """
-        if self.host is not None and self.transport is not None:
-            try:
-                bytes_sent = self.transport.write(data, (self.host, self.port))
-                if callback is not None:
-                    callback(bytes_sent)
-            except (OverflowError, TypeError, socket.error, socket.gaierror):
-                if callback is not None:
-                    callback(None)
+        try:
+            bytes_sent = self.transport.write(data, (self.host, self.port))
+            if callback is not None:
+                callback(bytes_sent)
+        except (OverflowError, TypeError, socket.error, socket.gaierror):
+            if callback is not None:
+                callback(None)
+
+
+class TwistedStatsDClient(object):
+
+    def __init__(self, host, port, connect_callback=None,
+                 disconnect_callback=None):
+        """Avoid using this initializer directly; Instead, use the create()
+        static method, otherwise the messages won't be really delivered.
+
+        If you still need to use this directly and want to resolve the host
+        yourself, remember to call host_resolved() as soon as it's resolved.
+
+        @param host: The StatsD server host.
+        @param port: The StatsD server port.
+        @param connect_callback: The callback to invoke on connection.
+        @param disconnect_callback: The callback to invoke on disconnection.
+        """
+        from twisted.internet import reactor
+
+        self.reactor = reactor
+
+        self.host = host
+        self.port = port
+        self.connect_callback = connect_callback
+        self.disconnect_callback = disconnect_callback
+        self.data_queue = DataQueue()
+
+        self.transport = None
+        self.transport_gateway = None
+
+    def __str__(self):
+        return "%s:%d" % (self.host, self.port)
+
+    @staticmethod
+    def create(host, port, connect_callback=None, disconnect_callback=None,
+               resolver_errback=None):
+        """Create an instance that resolves the host to an IP asynchronously.
+
+        Will queue all messages while the host is not yet resolved.
+
+        Build a connection that reports to the endpoint (on C{host} and
+        C{port}) using UDP.
+
+        @param host: The StatsD server host.
+        @param port: The StatsD server port.
+        @param resolver_errback: The errback to invoke should
+            issues occur resolving the supplied C{host}.
+        @param connect_callback: The callback to invoke on connection.
+        @param disconnect_callback: The callback to invoke on disconnection."""
+        from twisted.internet import reactor
+
+        instance = TwistedStatsDClient(
+            host=host, port=port, connect_callback=connect_callback,
+            disconnect_callback=disconnect_callback)
+
+        if resolver_errback is None:
+            resolver_errback = log.err
+
+        instance.resolve_later = reactor.resolve(host)
+        instance.resolve_later.addCallbacks(instance.host_resolved,
+                                            resolver_errback)
+
+        return instance
+
+    def connect(self, transport=None):
+        """Connect to the StatsD server."""
+        if transport is not None:
+            self.transport = transport
+            if self.transport_gateway is not None:
+                self.transport_gateway.transport = transport
+        self._flush_items()
+
+    def disconnect(self):
+        """Disconnect from the StatsD server."""
+        if self.disconnect_callback is not None:
+            self.disconnect_callback()
+        self.transport = None
+
+    def write(self, data, callback=None):
+        """Send the metric to the StatsD server.
+
+        @param data: The data to be sent.
+        @param callback: The callback to which the result should be sent.
+            B{Note}: The C{callback} will be called in the C{reactor}
+            thread, and not in the thread of the original caller.
+        """
+        if self.transport_gateway is not None and self.transport is not None:
+            return self.transport_gateway.write(data, callback)
+        return self.data_queue.write(data, callback)
+
+    def host_resolved(self, ip):
+        """Callback used when the host is resolved to an IP address."""
+        self.host = ip
+        self.transport_gateway = TransportGateway(self.transport, self.reactor,
+                                                  self.host, self.port)
+
+        if self.connect_callback is not None:
+            self.connect_callback()
+
+        self._flush_items()
+
+    def _flush_items(self):
+        """Flush all items (data, callback) from the DataQueue to the
+        TransportGateway."""
+        for item in self.data_queue.flush():
+            data, callback = item
+            self.write(data, callback)
