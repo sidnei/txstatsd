@@ -23,14 +23,21 @@ import socket
 
 try:
     import twisted
-except ImportError:
-    # If twisted is missing, still provide the non-twisted client
-    pass
-else:
     from txstatsd.protocol import (
         StatsDClientProtocol,
         TwistedStatsDClient,
     )
+except (ImportError, IOError):
+    # If twisted is missing, still provide the non-twisted client.
+    #
+    # The IOError happens when running code from mod_wsgi, manifested as:
+    #
+    #    IOError: ' sys.stdout access restricted by mod_wsgi'
+    #
+    # ... which can happen on certain versions of twisted, because they check
+    # for sys.stdout.encoding at the module-level of twisted.python.log. See:
+    # http://twistedmatrix.com/trac/ticket/6244 for more details.
+    pass
         
 from txstatsd.hashing import ConsistentHashRing
 
