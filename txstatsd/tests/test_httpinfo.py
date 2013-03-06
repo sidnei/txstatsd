@@ -111,7 +111,7 @@ class ServiceTestsBuilder(TestCase):
     def test_httpinfo_error(self):
         try:
             data = yield self.get_results("status", last_flush_duration=30)
-        except HttpException, e:
+        except HttpException as e:
             self.assertEquals(e.response.code, 500)
         else:
             self.fail("Not 500")
@@ -121,7 +121,7 @@ class ServiceTestsBuilder(TestCase):
         try:
             data = yield self.get_results("metrics/gorets",
                 timer_metrics={'gorets': 100})
-        except HttpException, e:
+        except HttpException as e:
             self.assertEquals(e.response.code, 404)
         else:
             self.fail("Not 404")

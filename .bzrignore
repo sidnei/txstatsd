@@ -1,2 +1,3 @@
 _trial_temp*
 twisted/plugins/dropin.cache
+__pycache__

@@ -22,7 +22,7 @@
 
 import sys
 
-from mocker import Mocker, expect, ANY
+from mocker import Mocker, expect
 from twisted.internet import reactor
 from twisted.internet.defer import inlineCallbacks, Deferred
 from twisted.python import log

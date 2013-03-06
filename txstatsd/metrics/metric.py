@@ -64,4 +64,4 @@ class Metric(object):
     def write(self, data):
         """Message the C{data} to the C{StatsD} server."""
         if self.connection is not None:
-            self.connection.write(data)
+            self.connection.write(data.encode('utf-8'))
