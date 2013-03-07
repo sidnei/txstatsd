@@ -22,7 +22,7 @@
 
 import sys
 
-from mocker import Mocker, expect
+from mock import Mock, call
 from twisted.internet import reactor
 from twisted.internet.defer import inlineCallbacks, Deferred
 from twisted.python import log
@@ -67,7 +67,6 @@ class TestClient(TestCase):
         super(TestClient, self).setUp()
         self.client = None
         self.exception = None
-        self.mocker = Mocker()
 
     def tearDown(self):
         if self.client:
@@ -250,11 +249,11 @@ class TestClient(TestCase):
         self.client = TwistedStatsDClient('localhost', 8000)
         self.build_protocol()
 
-        self.client.connect_callback = self.mocker.mock()
-        expect(self.client.connect_callback())
+        self.client.connect_callback = Mock()
 
-        with self.mocker:
-            self.client.host_resolved('127.0.0.1')
+        self.client.host_resolved('127.0.0.1')
+        self.assertTrue(self.client.connect_callback.called)
+        self.client.connect_callback.assert_called_once_with()
 
     def test_sends_messages_to_gateway_after_host_resolves(self):
         """After the host is resolved, send messages to the
@@ -265,14 +264,12 @@ class TestClient(TestCase):
 
         message = 'some data'
         bytes_sent = len(message)
-        self.client.data_queue = self.mocker.mock(spec=DataQueue)  # not called
-        self.client.transport_gateway = self.mocker.mock(spec=TransportGateway)
-        callback = self.mocker.mock()
-        expect(self.client.transport_gateway.write(message, callback)).result(
-            bytes_sent)
-
-        with self.mocker:
-            self.assertEqual(self.client.write(message, callback), bytes_sent)
+        self.client.data_queue =  Mock(spec=DataQueue)
+        self.client.transport_gateway = Mock(spec=TransportGateway)
+        callback = Mock()
+        self.client.transport_gateway.write.return_value = bytes_sent
+        self.assertEqual(self.client.write(message, callback), bytes_sent)
+        self.client.transport_gateway.write.assert_called_once_with(message, callback)
 
     def test_sends_messages_to_queue_before_host_resolves(self):
         """Before the host is resolved, send messages to the DataQueue."""
@@ -280,13 +277,12 @@ class TestClient(TestCase):
         self.build_protocol()
 
         message = 'some data'
-        bytes_sent = len(message)
-        self.client.data_queue = self.mocker.mock(spec=DataQueue)
-        callback = self.mocker.mock()
-        expect(self.client.data_queue.write(message, callback)).result(None)
-
-        with self.mocker:
-            self.assertEqual(self.client.write(message, callback), None)
+        self.client.data_queue =  Mock(spec=DataQueue)
+        callback = Mock()
+        self.client.data_queue.write.return_value = None
+        result = self.client.write(message, callback)
+        self.client.data_queue.write.assert_called_once_with(message, callback)
+        self.assertEqual(result, None)
 
     def test_flushes_queued_messages_to_the_gateway_when_host_resolves(self):
         """As soon as the host is resolved, flush all messages to the
@@ -298,14 +294,14 @@ class TestClient(TestCase):
         self.client.data_queue.write('data 2', 'callback 2')
         self.client.data_queue.write('data 3', 'callback 3')
 
-        mock_gateway_write = self.mocker.mock()
+        mock_gateway_write = Mock()
         self.patch(TransportGateway, 'write', mock_gateway_write)
-        expect(mock_gateway_write('data 1', 'callback 1'))
-        expect(mock_gateway_write('data 2', 'callback 2'))
-        expect(mock_gateway_write('data 3', 'callback 3'))
-
-        with self.mocker:
-            self.client.host_resolved('127.0.0.1')
+        self.client.host_resolved('127.0.0.1')
+        self.assertTrue(mock_gateway_write.call_count, 3)
+        expected = [call('data 1', 'callback 1'),
+                    call('data 2', 'callback 2'),
+                    call('data 3', 'callback 3')]
+        self.assertEqual(mock_gateway_write.call_args_list, expected)
 
     def test_sets_client_transport_when_connected(self):
         """Set the transport as an attribute of the client."""
