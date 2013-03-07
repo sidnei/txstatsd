@@ -23,7 +23,7 @@ import os
 import psutil
 import sys
 
-from mocker import MockerTestCase
+import mock
 from twisted.trial.unittest import TestCase
 
 from txstatsd.process import (
@@ -82,7 +82,7 @@ eth0: 206594440  189319    0    0    0     0          0         0 23357088  1650
 tun0: 5138313   24837    0    0    0     0          0         0  5226635   26986    0    0    0     0       0          0"""
 
 
-class TestSystemPerformance(TestCase, MockerTestCase):
+class TestSystemPerformance(TestCase):
     """Test system performance monitoring."""
 
     def test_loadinfo(self):
@@ -102,11 +102,10 @@ class TestSystemPerformance(TestCase, MockerTestCase):
     def test_cpu_counters(self):
         """System cpu counters are collected through psutil."""
         cpu_times = psutil.cpu_times()
-        mock = self.mocker.replace("psutil.cpu_times")
-        self.expect(mock(percpu=False)).result(cpu_times)
-        self.mocker.replay()
-
-        result = report_system_stats()
+        with mock.patch("psutil.cpu_times"):
+            psutil.cpu_times.return_value = cpu_times
+            result = report_system_stats()
+            psutil.cpu_times.assert_called_once_with(percpu=False)
         # cpu_times is platform-dependent
         if sys.platform.lower().startswith("linux"):
             self.assertEqual(cpu_times.user, result["sys.cpu.user"])
@@ -132,11 +131,10 @@ class TestSystemPerformance(TestCase, MockerTestCase):
     def test_per_cpu_counters(self):
         """System percpu counters are collected through psutil."""
         cpu_times = psutil.cpu_times()
-        mock = self.mocker.replace("psutil.cpu_times")
-        self.expect(mock(percpu=True)).result([cpu_times, cpu_times])
-        self.mocker.replay()
-
-        result = report_system_stats(percpu=True)
+        with mock.patch("psutil.cpu_times"):
+            psutil.cpu_times.return_value = [cpu_times, cpu_times]
+            result = report_system_stats(percpu=True)
+            psutil.cpu_times.assert_called_once_with(percpu=True)
         # cpu_times is platform-dependent
         if sys.platform.lower().startswith("linux"):
             self.assertEqual(cpu_times.user, result["sys.cpu.000.user"])
@@ -187,14 +185,12 @@ class TestSystemPerformance(TestCase, MockerTestCase):
         cpu_percent = process.get_cpu_percent()
         memory_percent = process.get_memory_percent()
 
-        mock = self.mocker.mock()
-        self.expect(mock.get_memory_info()).result((vsize, rss))
-        self.expect(mock.get_cpu_percent()).result(cpu_percent)
-        self.expect(mock.get_memory_percent()).result(memory_percent)
-        self.expect(mock.get_num_threads).result(None)
-        self.mocker.replay()
-
-        result = ProcessReport(process=mock).get_memory_and_cpu()
+        proc = mock.Mock()
+        proc.get_memory_info.return_value = (vsize, rss)
+        proc.get_cpu_percent.return_value = cpu_percent
+        proc.get_memory_percent.return_value = memory_percent
+        proc.get_num_threads = None
+        result = ProcessReport(process=proc).get_memory_and_cpu()
         self.assertEqual(cpu_percent, result["proc.cpu.percent"])
         self.assertEqual(vsize, result["proc.memory.vsize"])
         self.assertEqual(rss, result["proc.memory.rss"])
@@ -208,11 +204,10 @@ class TestSystemPerformance(TestCase, MockerTestCase):
         process = psutil.Process(os.getpid())
         utime, stime = process.get_cpu_times()
 
-        mock = self.mocker.mock()
-        self.expect(mock.get_cpu_times()).result((utime, stime))
-        self.mocker.replay()
-
-        result = ProcessReport(process=mock).get_cpu_counters()
+        proc = mock.Mock()
+        proc.get_cpu_times.return_value = (utime, stime)
+        result = ProcessReport(process=proc).get_cpu_counters()
+        proc.get_cpu_times.assert_called_once_with()
         self.assertEqual(utime, result["proc.cpu.user"])
         self.assertEqual(stime, result["proc.cpu.system"])
 
@@ -229,14 +224,18 @@ class TestSystemPerformance(TestCase, MockerTestCase):
         cpu_percent = process.get_cpu_percent()
         memory_percent = process.get_memory_percent()
 
-        mock = self.mocker.mock()
-        self.expect(mock.get_memory_info()).result((vsize, rss))
-        self.expect(mock.get_cpu_percent()).result(cpu_percent)
-        self.expect(mock.get_memory_percent()).result(memory_percent)
-        self.expect(mock.get_num_threads()).result(1)
-        self.mocker.replay()
+        proc = mock.Mock()
+        proc.get_memory_info.return_value = (vsize, rss)
+        proc.get_cpu_percent.return_value = cpu_percent
+        proc.get_memory_percent.return_value = memory_percent
+        proc.get_num_threads.return_value = 1
+        result = ProcessReport(process=proc).get_memory_and_cpu()
+        proc.get_memory_info.assert_called_once_with()
+        proc.get_cpu_percent.assert_called_once_with()
+        proc.get_memory_percent.assert_called_once_with()
+        proc.get_num_threads.assert_called_once_with()
 
-        result = ProcessReport(process=mock).get_memory_and_cpu()
+
         self.assertEqual(cpu_percent, result["proc.cpu.percent"])
         self.assertEqual(vsize, result["proc.memory.vsize"])
         self.assertEqual(rss, result["proc.memory.rss"])
@@ -245,13 +244,11 @@ class TestSystemPerformance(TestCase, MockerTestCase):
 
     def test_ioinfo(self):
         """Process IO info is collected through psutil."""
-        mock = self.mocker.mock()
-        self.expect(mock.get_io_counters).result(None)
-        self.mocker.replay()
-
         # If the version of psutil doesn't have the C{get_io_counters},
         # then io stats are not included in the output.
-        result = ProcessReport(process=mock).get_io_counters()
+        proc = mock.Mock()
+        proc.get_io_counters = None
+        result = ProcessReport(process=proc).get_io_counters()
         self.failIf("proc.io.read.count" in result)
         self.failIf("proc.io.write.count" in result)
         self.failIf("proc.io.read.bytes" in result)
@@ -266,12 +263,10 @@ class TestSystemPerformance(TestCase, MockerTestCase):
         """
         io_counters = (10, 42, 125, 16)
 
-        mock = self.mocker.mock()
-        self.expect(mock.get_io_counters).result(mock)
-        self.expect(mock.get_io_counters()).result(io_counters)
-        self.mocker.replay()
-
-        result = ProcessReport(process=mock).get_io_counters()
+        proc = mock.Mock()
+        proc.get_io_counters.return_value = io_counters
+        result = ProcessReport(process=proc).get_io_counters()
+        proc.get_io_counters.assert_called_once_with()
         self.assertEqual(10, result["proc.io.read.count"])
         self.assertEqual(42, result["proc.io.write.count"])
         self.assertEqual(125, result["proc.io.read.bytes"])
@@ -284,13 +279,11 @@ class TestSystemPerformance(TestCase, MockerTestCase):
         If the version of psutil doesn't implement C{get_connections} for
         L{Process}, then no information is returned.
         """
-        mock = self.mocker.mock()
-        self.expect(mock.get_connections).result(None)
-        self.mocker.replay()
-
         # If the version of psutil doesn't have the C{get_io_counters},
         # then io stats are not included in the output.
-        result = ProcessReport(process=mock).get_net_stats()
+        proc = mock.Mock()
+        proc.get_connections = None
+        result = ProcessReport(process=proc).get_net_stats()
         self.failIf("proc.net.status.established" in result)
 
     def test_netinfo_with_get_connections(self):
@@ -311,37 +304,32 @@ class TestSystemPerformance(TestCase, MockerTestCase):
              ("72.14.234.83", 443), "SYN_SENT")
             ]
 
-        mock = self.mocker.mock()
-        self.expect(mock.get_connections).result(mock)
-        self.expect(mock.get_connections()).result(connections)
-        self.mocker.replay()
-
-        result = ProcessReport(process=mock).get_net_stats()
+        proc = mock.Mock()
+        proc.get_connections.return_value = connections
+        result = ProcessReport(process=proc).get_net_stats()
+        proc.get_connections.assert_called_once_with()
         self.assertEqual(2, result["proc.net.status.established"])
         self.assertEqual(1, result["proc.net.status.closing"])
         self.assertEqual(1, result["proc.net.status.syn_sent"])
 
     def test_reactor_stats(self):
         """Given a twisted reactor, pull out some stats from it."""
-        mock = self.mocker.mock()
-        self.expect(mock.getReaders()).result([None, None, None])
-        self.expect(mock.getWriters()).result([None, None])
-        self.mocker.replay()
-
-        result = report_reactor_stats(mock)()
+        mock_reactor = mock.Mock()
+        mock_reactor.getReaders.return_value = [None, None, None]
+        mock_reactor.getWriters.return_value = [None, None]
+        result = report_reactor_stats(mock_reactor)()
         self.assertEqual(3, result["reactor.readers"])
         self.assertEqual(2, result["reactor.writers"])
 
     def test_threadpool_stats(self):
         """Given a twisted threadpool, pull out some stats from it."""
-        mock = self.mocker.mock()
-        self.expect(mock.q.qsize()).result(42)
-        self.expect(mock.threads).result(6 * [None])
-        self.expect(mock.waiters).result(2 * [None])
-        self.expect(mock.working).result(4 * [None])
-        self.mocker.replay()
+        mock_reactor = mock.Mock()
+        mock_reactor.q.qsize.return_value = 42
+        mock_reactor.threads = 6 * [None]
+        mock_reactor.waiters = 2 * [None]
+        mock_reactor.working = 4 * [None]
 
-        result = report_threadpool_stats(mock)()
+        result = report_threadpool_stats(mock_reactor)()
         self.assertEqual(42, result["threadpool.queue"])
         self.assertEqual(6, result["threadpool.threads"])
         self.assertEqual(2, result["threadpool.waiters"])
@@ -385,5 +373,5 @@ class TestSystemPerformance(TestCase, MockerTestCase):
         self.assertEqual({"foo": 4}, wrapped())
         self.assertEqual({"foo": 5}, wrapped())
         self.assertEqual({"foo": 7}, wrapped())
-        
+
 
