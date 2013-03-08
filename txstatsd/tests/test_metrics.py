@@ -52,28 +52,29 @@ class TestMetrics(TestCase):
         """Test reporting of a gauge metric sample."""
         self.metrics.gauge('gauge', 102)
         self.assertEqual(self.connection.data,
-                         'txstatsd.tests.gauge:102|g')
+                         b'txstatsd.tests.gauge:102|g')
 
     def test_meter(self):
         """Test reporting of a meter metric sample."""
         self.metrics.meter('meter', 3)
         self.assertEqual(self.connection.data,
-                         'txstatsd.tests.meter:3|m')
+                         b'txstatsd.tests.meter:3|m')
 
     def test_counter(self):
         """Test the increment and decrement operations."""
         self.metrics.increment('counter', 18)
         self.assertEqual(self.connection.data,
-                         'txstatsd.tests.counter:18|c')
+                         b'txstatsd.tests.counter:18|c')
         self.metrics.decrement('counter', 9)
         self.assertEqual(self.connection.data,
-                         'txstatsd.tests.counter:-9|c')
+                         b'txstatsd.tests.counter:-9|c')
 
     def test_timing(self):
         """Test the timing operation."""
         self.metrics.timing('timing', 101.1234)
-        self.assertEqual(self.connection.data,
-                         'txstatsd.tests.timing:101123.4|ms')
+        # to support both 2 and 3, can't use assertRegex
+        match = re.match(b'txstatsd.tests.timing:101123.4[0-9]*|ms', self.connection.data)
+        self.assertFalse(match is None)
 
     def test_timing_automatic(self):
         """Test the automatic timing operation with explicit reset"""
@@ -85,9 +86,9 @@ class TestMetrics(TestCase):
 
         elapsed = time.time() - start_time
 
-        label, val, units = re.split(":|\|", self.connection.data)
-        self.assertEqual(label, 'txstatsd.tests.timing')
-        self.assertEqual(units, 'ms')
+        label, val, units = re.split(b":|\|", self.connection.data)
+        self.assertEqual(label, b'txstatsd.tests.timing')
+        self.assertEqual(units, b'ms')
         self.assertTrue(100 <= float(val) <= elapsed * 1000)
 
     def test_timing_automatic_implicit_reset(self):
@@ -100,34 +101,34 @@ class TestMetrics(TestCase):
 
         elapsed = time.time() - start_time
 
-        label, val, units = re.split(":|\|", self.connection.data)
-        self.assertEqual(label, 'txstatsd.tests.timing')
-        self.assertEqual(units, 'ms')
+        label, val, units = re.split(b":|\|", self.connection.data)
+        self.assertEqual(label, b'txstatsd.tests.timing')
+        self.assertEqual(units, b'ms')
         self.assertTrue(100 <= float(val) <= elapsed * 1000)
 
     def test_generic(self):
         """Test the GenericMetric class."""
         self.metrics.report('users', "pepe", "pd")
         self.assertEqual(self.connection.data,
-                         'txstatsd.tests.users:pepe|pd')
+                         b'txstatsd.tests.users:pepe|pd')
 
     def test_generic_extra(self):
         """Test the GenericMetric class."""
         self.metrics.report('users', "pepe", "pd", 100)
         self.assertEqual(self.connection.data,
-                         'txstatsd.tests.users:pepe|pd|100')
+                         b'txstatsd.tests.users:pepe|pd|100')
 
     def test_empty_namespace(self):
         """Test reporting of an empty namespace."""
         self.metrics.namespace = None
         self.metrics.gauge('gauge', 213)
         self.assertEqual(self.connection.data,
-                         'gauge:213|g')
+                         b'gauge:213|g')
 
         self.metrics.namespace = ''
         self.metrics.gauge('gauge', 413)
         self.assertEqual(self.connection.data,
-                         'gauge:413|g')
+                         b'gauge:413|g')
 
 
 class TestExtendedMetrics(TestMetrics):
@@ -139,21 +140,21 @@ class TestExtendedMetrics(TestMetrics):
         """Test the increment and decrement operations."""
         self.metrics.increment('counter', 18)
         self.assertEqual(self.connection.data,
-                         'txstatsd.tests.counter:18|c')
+                         b'txstatsd.tests.counter:18|c')
         self.metrics.decrement('counter', 9)
         self.assertEqual(self.connection.data,
-                         'txstatsd.tests.counter:9|c')
+                         b'txstatsd.tests.counter:9|c')
 
     def test_sli(self):
         """Test SLI call."""
         self.metrics.sli('users', 100)
         self.assertEqual(self.connection.data,
-                         'txstatsd.tests.users:100|sli')
+                         b'txstatsd.tests.users:100|sli')
 
         self.metrics.sli('users', 200, 2)
         self.assertEqual(self.connection.data,
-                         'txstatsd.tests.users:200|sli|2')
+                         b'txstatsd.tests.users:200|sli|2')
 
         self.metrics.sli_error('users')
         self.assertEqual(self.connection.data,
-                         'txstatsd.tests.users:error|sli')
+                         b'txstatsd.tests.users:error|sli')

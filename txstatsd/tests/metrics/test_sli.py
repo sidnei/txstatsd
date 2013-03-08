@@ -20,8 +20,12 @@
 # TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 # SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-import ConfigParser
-from cStringIO import StringIO
+try:
+    import ConfigParser
+    from StringIO import StringIO
+except ImportError:
+    import configparser as ConfigParser
+    from io import StringIO
 from twisted.trial.unittest import TestCase
 
 from twisted.plugins.sli_plugin import SLIMetricFactory

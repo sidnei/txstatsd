@@ -28,8 +28,9 @@ And extended for sliding windows.
 """
 import random
 import time
+import sys
 
-from zope.interface import implements
+from zope.interface import implementer, implements
 
 from txstatsd.metrics.metric import Metric
 from txstatsd.itxstatsd import IMetric
@@ -121,7 +122,8 @@ class DistinctMetricReporter(object):
     Keeps an estimate of the distinct numbers of items seen on various
     sliding windows of time.
     """
-    implements(IMetric)
+    if sys.version_info[0:2] == (2,6):
+        implements(IMetric)
 
     def __init__(self, name, wall_time_func=time.time, prefix=""):
         """Construct a metric we expect to be periodically updated.
@@ -166,3 +168,7 @@ class DistinctMetricReporter(object):
         for item, value in items.iteritems():
             metrics.append((self.prefix + self.name + item, value, timestamp))
         return metrics
+
+# if we are running anything >= 2.7
+if sys.version_info[0:2] >= (2,7):
+    DistinctMetricReporter = implementer(IMetric)(DistinctMetricReporter)

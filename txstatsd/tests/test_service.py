@@ -20,8 +20,12 @@
 # SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 import tempfile
-import ConfigParser
-from StringIO import StringIO
+try:
+    import ConfigParser
+    from StringIO import StringIO
+except ImportError:
+    import configparser as ConfigParser
+    from io import StringIO
 
 from twisted.trial.unittest import TestCase
 
@@ -203,7 +207,8 @@ class Agent(DatagramProtocol):
     def __init__(self):
         self.monitor_response = None
 
-    def datagramReceived(self, data, (host, port)):
+    def datagramReceived(self, data, host_port):
+        host, port = host_port
         self.monitor_response = data
 
 

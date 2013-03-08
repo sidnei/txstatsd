@@ -179,7 +179,7 @@ class TestUDPRedirect(TxTestCase):
 
         class Collect(DatagramProtocol):
 
-            def datagramReceived(cself, data, (host, port)):
+            def datagramReceived(cself, data, host_port):
                 self.got_data(data)
 
         self.port = reactor.listenUDP(0, Collect())

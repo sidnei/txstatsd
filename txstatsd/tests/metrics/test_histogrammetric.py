@@ -102,7 +102,7 @@ class TestHistogramReporterMetric(TestCase):
             histogram.update(i)
 
         hist = histogram.histogram()
-        self.assertEquals(sum(hist), 10000)
+        self.assertEqual(sum(hist), 10000)
 
         total = sum(hist)
         binsize = int(total / len(hist))

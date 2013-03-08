@@ -18,6 +18,7 @@
 # CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
 # TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 # SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+from __future__ import print_function
 
 import random
 
@@ -45,7 +46,7 @@ class TestHash(TestCase):
             from scipy.stats import chi2
         except ImportError:
             raise SkipTest("Missing chi2, skipping")
-            
+
         N = 10000
 
         for (bits, buckets) in [(-1, 1024), (24, 256),
@@ -61,7 +62,7 @@ class TestHash(TestCase):
             value = sum(((x - N / buckets) ** 2) / (N / buckets) for x in bins)
             pval = chi2.cdf(value, N)
             if pval > 0.5:
-                print bins, pval
+                print(bins, pval)
             self.assertTrue(pval < 0.5, "bits %s, pval == %s" % (bits, pval))
     test_chi_square.skip = "Takes too long to run every time."
 
@@ -110,7 +111,7 @@ class TestDistinctMetricReporter(TestCase):
 
 
 class TestPlugin(TestCase):
-    
+
     def test_factory(self):
         self.assertTrue(distinct_plugin.distinct_metric_factory in \
                         list(getPlugins(IMetricFactory)))
