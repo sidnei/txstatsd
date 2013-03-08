@@ -170,5 +170,5 @@ class DistinctMetricReporter(object):
         return metrics
 
 # if we are running anything >= 2.7
-if sys.version_info[0:2] == (2,7) or sys.version_info[0] == 3:
+if sys.version_info[0:2] >= (2,7):
     DistinctMetricReporter = implementer(IMetric)(DistinctMetricReporter)
