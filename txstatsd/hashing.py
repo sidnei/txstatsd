@@ -33,8 +33,8 @@ class ConsistentHashRing:
             self.add_node(node)
 
     def compute_ring_position(self, key):
-        big_hash = md5(str(key)).hexdigest()
-        small_hash = long(big_hash[:8], 16)
+        big_hash = md5(key.encode('utf-8')).hexdigest()
+        small_hash = int(big_hash[:8], 16)
         return small_hash
 
     def add_node(self, node):
