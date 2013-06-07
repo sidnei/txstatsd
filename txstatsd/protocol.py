@@ -21,7 +21,7 @@
 
 import socket
 
-from twisted.internet.defer import inlineCallbacks, returnValue, Deferred
+from twisted.internet import abstract
 from twisted.internet.protocol import DatagramProtocol
 from twisted.python import log
 
@@ -138,6 +138,9 @@ class TwistedStatsDClient(object):
 
         self.transport = None
         self.transport_gateway = None
+
+        if abstract.isIPAddress(host):
+            self.host_resolved(host)
 
     def __str__(self):
         return "%s:%d" % (self.host, self.port)
