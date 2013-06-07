@@ -41,7 +41,7 @@ from txstatsd.server.protocol import (
     StatsDServerProtocol, StatsDTCPServerFactory)
 from txstatsd.server.router import Router
 from txstatsd.server import httpinfo
-from txstatsd.report import ReportingService
+from txstatsd.report import ReportingService, ReactorInspectorService
 from txstatsd.itxstatsd import IMetricFactory
 from twisted.application.service import Service
 from twisted.internet import task
@@ -315,6 +315,11 @@ def createService(options):
             process.report_reactor_stats(reactor), 60, metrics.gauge)
         reports = [name.strip() for name in options["report"].split(",")]
         for report_name in reports:
+            if report_name == "reactor":
+                inspector = ReactorInspectorService(reactor, metrics,
+                                                    loop_time=0.1)
+                inspector.setServiceParent(root_service)
+
             for reporter in getattr(process, "%s_STATS" %
                                     report_name.upper(), ()):
                 reporting.schedule(reporter, 60, metrics.gauge)
