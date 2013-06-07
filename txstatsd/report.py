@@ -19,6 +19,13 @@
 # TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 # SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
+import os
+import sys
+import time
+import threading
+import traceback
+import Queue
+
 from twisted.internet.defer import maybeDeferred
 from twisted.internet.task import LoopingCall
 from twisted.python import log
@@ -81,4 +88,108 @@ class ReportingService(Service):
     def stopService(self):
         for task, interval in self.tasks:
             task.stop()
+        Service.stopService(self)
+
+
+class ReactorInspector(threading.Thread):
+    """Log message with a time delta from the last call."""
+
+    def __init__(self, reactor_call, metrics, loop_time=3):
+        self.running = False
+        self.stopped = False
+        self.queue = Queue.Queue()
+        self.reactor_call = reactor_call
+        self.loop_time = loop_time
+        self.last_responsive_ts = 0
+        self.reactor_thread = None
+        self.metrics = metrics
+        super(ReactorInspector, self).__init__()
+        self.daemon = True
+
+    def start(self):
+        """Start the thread. Should be called from the reactor main thread."""
+        self.reactor_thread = threading.currentThread().ident
+        if not self.running:
+            self.running = True
+            super(ReactorInspector, self).start()
+
+    def stop(self):
+        """Stop the thread."""
+        self.stopped = True
+        log.msg("ReactorInspector: stopped")
+
+    def dump_frames(self):
+        """Dump frames info to log file."""
+        current = threading.currentThread().ident
+        frames = sys._current_frames()
+        for frame_id, frame in frames.iteritems():
+            if frame_id == current:
+                continue
+
+            stack = ''.join(traceback.format_stack(frame))
+
+            if frame_id == self.reactor_thread:
+                title = "Dumping Python frame for reactor main thread"
+            else:
+                title = "Dumping Python frame"
+            log.msg("%s %s (pid: %d):\n%s" %
+                    (title, frame_id, os.getpid(), stack))
+
+    def run(self):
+        """Start running the thread."""
+        log.msg("ReactorInspector: started")
+        msg_id = 0
+        oldest_pending_request_ts = time.time()
+        while not self.stopped:
+            def task(msg_id=msg_id, tini=time.time()):
+                """Put result in queue with initial and completed times."""
+                self.queue.put((msg_id, tini, time.time()))
+            self.reactor_call(task)
+            time.sleep(self.loop_time)
+            try:
+                id_sent, tini, tsent = self.queue.get_nowait()
+            except Queue.Empty:
+                # Oldest pending request is still out there
+                delay = time.time() - oldest_pending_request_ts
+                self.metrics.gauge("delay", delay)
+                log.msg("ReactorInspector: detected unresponsive!"
+                        " (current: %d, pid: %d) delay: %.3f" % (
+                            msg_id, os.getpid(), delay))
+                self.dump_frames()
+            else:
+                delay = tsent - tini
+                self.metrics.gauge("delay", delay)
+                if msg_id > id_sent:
+                    log.msg("ReactorInspector: late (current: %d, "
+                            "got: %d, pid: %d, cleaning queue) "
+                            "delay: %.3f" % (msg_id, id_sent,
+                                             os.getpid(), delay))
+                    while not self.queue.empty():
+                        self.queue.get_nowait()
+                    # About to start a new request with nothing pending
+                    oldest_pending_request_ts = time.time()
+                else:
+                    assert msg_id == id_sent
+                    # About to start a new request with nothing pending
+                    self.last_responsive_ts = time.time()
+                    oldest_pending_request_ts = self.last_responsive_ts
+                    log.msg("ReactorInspector: ok (msg: %d, "
+                            "pid: %d) delay: %.3f" % (
+                                msg_id, os.getpid(), delay))
+            finally:
+                msg_id += 1
+
+
+class ReactorInspectorService(Service):
+
+    def __init__(self, reactor, metrics, loop_time=3):
+        self.inspector = ReactorInspector(
+            reactor.callFromThread, metrics, loop_time)
+
+    def startService(self):
+        Service.startService(self)
+        self.inspector.start()
+
+    def stopService(self):
+        self.inspector.stop()
         Service.stopService(self)
