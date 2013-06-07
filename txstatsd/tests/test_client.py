@@ -198,9 +198,16 @@ class TestClient(TestCase):
 
         self.assertIsInstance(self.client.data_queue, DataQueue)
 
-    def test_starts_without_transport_gateway(self):
+    def test_starts_with_transport_gateway_if_ip(self):
         """The client starts without a TransportGateway."""
         self.client = TwistedStatsDClient('127.0.0.1', 8000)
+        self.build_protocol()
+
+        self.assertTrue(self.client.transport_gateway is not None)
+
+    def test_starts_without_transport_gateway_if_not_ip(self):
+        """The client starts without a TransportGateway."""
+        self.client = TwistedStatsDClient('localhost', 8000)
         self.build_protocol()
 
         self.assertTrue(self.client.transport_gateway is None)
@@ -269,7 +276,8 @@ class TestClient(TestCase):
         callback = Mock()
         self.client.transport_gateway.write.return_value = bytes_sent
         self.assertEqual(self.client.write(message, callback), bytes_sent)
-        self.client.transport_gateway.write.assert_called_once_with(message, callback)
+        self.client.transport_gateway.write.assert_called_once_with(
+            message, callback)
 
     def test_sends_messages_to_queue_before_host_resolves(self):
         """Before the host is resolved, send messages to the DataQueue."""
@@ -277,7 +285,7 @@ class TestClient(TestCase):
         self.build_protocol()
 
         message = 'some data'
-        self.client.data_queue =  Mock(spec=DataQueue)
+        self.client.data_queue = Mock(spec=DataQueue)
         callback = Mock()
         self.client.data_queue.write.return_value = None
         result = self.client.write(message, callback)
