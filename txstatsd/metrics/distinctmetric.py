@@ -165,7 +165,7 @@ class DistinctMetricReporter(object):
                  ".count_1min": self.count_1min(now),
                  ".count_1hour": self.count_1hour(now),
                  ".count_1day": self.count_1day(now)}
-        for item, value in items.iteritems():
+        for item, value in sorted(items.iteritems()):
             metrics.append((self.prefix + self.name + item, value, timestamp))
         return metrics
 

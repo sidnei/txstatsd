@@ -118,7 +118,7 @@ class TimerMetricReporter(object):
         @param percentiles: One or more percentiles.
         """
         return [percentile for percentile in
-            self.histogram.percentiles(*percentiles)]
+                self.histogram.percentiles(*percentiles)]
 
     def get_values(self):
         """Returns a list of all recorded durations in the timer's sample."""
@@ -145,8 +145,8 @@ class TimerMetricReporter(object):
                  ".999percentile": percentiles[5],
                  ".count": self.count,
                  ".rate": self.rate(timestamp),
-            }
-        for item, value in items.iteritems():
+                 }
+        for item, value in sorted(items.iteritems()):
             metrics.append((self.prefix + self.name + item,
                             round(value, 6), timestamp))
         self.clear(timestamp)

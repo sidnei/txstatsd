@@ -40,7 +40,7 @@ class FlushMessagesTest(TestCase):
         configurable_processor = ConfigurableMessageProcessor(
             time_function=lambda: 42)
         configurable_processor.process("gorets:17|c")
-        messages = configurable_processor.flush()
+        messages = list(configurable_processor.flush())
         self.assertEqual(("gorets.count", 17, 42), messages[0])
         self.assertEqual(("statsd.numStats", 1, 42), messages[1])
 
@@ -51,7 +51,7 @@ class FlushMessagesTest(TestCase):
         configurable_processor = ConfigurableMessageProcessor(
             time_function=lambda: 42, message_prefix="test.metric")
         configurable_processor.process("gorets:17|c")
-        messages = configurable_processor.flush()
+        messages = list(configurable_processor.flush())
         self.assertEqual(("test.metric.gorets.count", 17, 42), messages[0])
         self.assertEqual(("test.metric.statsd.numStats", 1, 42),
                          messages[1])
@@ -64,7 +64,7 @@ class FlushMessagesTest(TestCase):
             time_function=lambda: 42, message_prefix="test.metric",
             internal_metrics_prefix="statsd.foo.")
         configurable_processor.process("gorets:17|c")
-        messages = configurable_processor.flush()
+        messages = list(configurable_processor.flush())
         self.assertEqual(("test.metric.gorets.count", 17, 42), messages[0])
         self.assertEqual(("statsd.foo.numStats", 1, 42),
                          messages[1])
@@ -77,7 +77,7 @@ class FlushMessagesTest(TestCase):
             time_function=lambda: 42, message_prefix="test.metric",
             plugins=[distinct_metric_factory])
         configurable_processor.process("gorets:17|pd")
-        messages = configurable_processor.flush()
+        messages = list(configurable_processor.flush())
         self.assertEquals(("test.metric.gorets.count", 1, 42), messages[0])
 
     def test_flush_single_timer_single_time(self):
@@ -94,7 +94,7 @@ class FlushMessagesTest(TestCase):
         configurable_processor.process("glork:24|ms")
         _now = 42
 
-        messages = configurable_processor.flush()
+        messages = list(configurable_processor.flush())
         messages.sort()
 
         expected = [
@@ -128,7 +128,7 @@ class FlushMessagesTest(TestCase):
         configurable_processor.process("glork:42|ms")
 
         _now = 42
-        messages = configurable_processor.flush()
+        messages = list(configurable_processor.flush())
         messages.sort()
 
         expected = [
@@ -169,7 +169,7 @@ class FlushMeterMetricMessagesTest(TestCase):
         self.configurable_processor.process("gorets:3.0|m")
 
         self.time_now += 1
-        messages = self.configurable_processor.flush()
+        messages = list(self.configurable_processor.flush())
         self.assertEqual(("test.metric.gorets.count", 3.0, self.time_now),
                          messages[0])
         self.assertEqual(("test.metric.gorets.rate", 3.0, self.time_now),

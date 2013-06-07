@@ -22,6 +22,7 @@
 import os
 import sys
 import time
+import logging
 import threading
 import traceback
 import Queue
@@ -175,7 +176,8 @@ class ReactorInspector(threading.Thread):
                     oldest_pending_request_ts = self.last_responsive_ts
                     log.msg("ReactorInspector: ok (msg: %d, "
                             "pid: %d) delay: %.3f" % (
-                                msg_id, os.getpid(), delay))
+                                msg_id, os.getpid(), delay),
+                            logLevel=logging.DEBUG)
             finally:
                 msg_id += 1
 

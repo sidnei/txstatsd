@@ -48,8 +48,7 @@ class LoggingMessageProcessor(ConfigurableMessageProcessor):
 
     def flush(self, interval=10000, percent=90):
         """Log all received metric samples to the supplied logger."""
-        messages = list(super(LoggingMessageProcessor, self).flush(
-            interval=interval, percent=percent))
-        for msg in messages:
+        parent = super(LoggingMessageProcessor, self)
+        for msg in parent.flush(interval=interval, percent=percent):
             self.logger.info("Out: %s %s %s" % msg)
-        return messages
+            yield msg

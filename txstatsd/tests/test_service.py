@@ -307,4 +307,3 @@ class ServiceTestsBuilder(TestCase):
 
         reactor.callWhenRunning(exercise)
         reactor.run()
-

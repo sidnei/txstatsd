@@ -25,6 +25,7 @@ import time
 import logging
 
 from twisted.python import log
+from twisted.internet.task import Cooperator
 
 from txstatsd.metrics.metermetric import MeterMetricReporter
 
@@ -226,73 +227,75 @@ class MessageProcessor(BaseMessageProcessor):
         Flush all queued stats, computing a normalized count based on
         C{interval} and mean timings based on C{threshold}.
         """
-        messages = []
         per_metric = {}
         num_stats = 0
         interval = interval / 1000
         timestamp = int(self.time_function())
 
         start = self.time_function()
-        counter_metrics, events = self.flush_counter_metrics(interval,
-                                                             timestamp)
+        events = 0
+        for metrics in self.flush_counter_metrics(interval, timestamp):
+            for metric in metrics:
+                yield metric
+            events += 1
         duration = self.time_function() - start
-        if events > 0:
-            messages.extend(sorted(counter_metrics))
-            num_stats += events
+        num_stats += events
         per_metric["counter"] = (events, duration)
 
         start = self.time_function()
-        timer_metrics, events = self.flush_timer_metrics(percent, timestamp)
+        events = 0
+        for metrics in self.flush_timer_metrics(percent, timestamp):
+            for metric in metrics:
+                yield metric
+            events += 1
         duration = self.time_function() - start
-        if events > 0:
-            messages.extend(sorted(timer_metrics))
-            num_stats += events
+        num_stats += events
         per_metric["timer"] = (events, duration)
 
         start = self.time_function()
-        gauge_metrics, events = self.flush_gauge_metrics(timestamp)
+        events = 0
+        for metrics in self.flush_gauge_metrics(timestamp):
+            for metric in metrics:
+                yield metric
+            events += 1
         duration = self.time_function() - start
-        if events > 0:
-            messages.extend(sorted(gauge_metrics))
-            num_stats += events
+        num_stats += events
         per_metric["gauge"] = (events, duration)
 
         start = self.time_function()
-        meter_metrics, events = self.flush_meter_metrics(timestamp)
+        events = 0
+        for metrics in self.flush_meter_metrics(timestamp):
+            for metric in metrics:
+                yield metric
+            events += 1
         duration = self.time_function() - start
-        if events > 0:
-            messages.extend(sorted(meter_metrics))
-            num_stats += events
+        num_stats += events
         per_metric["meter"] = (events, duration)
 
         start = self.time_function()
-        plugin_metrics, events = self.flush_plugin_metrics(interval, timestamp)
+        events = 0
+        for metrics in self.flush_plugin_metrics(interval, timestamp):
+            for metric in metrics:
+                yield metric
+            events += 1
         duration = self.time_function() - start
-        if events > 0:
-            messages.extend(sorted(plugin_metrics))
-            num_stats += events
+        num_stats += events
         per_metric["plugin"] = (events, duration)
 
-        self.flush_metrics_summary(messages, num_stats, per_metric, timestamp)
-        return messages
+        for metrics in self.flush_metrics_summary(num_stats, per_metric,
+                                                  timestamp):
+            for metric in metrics:
+                yield metric
 
     def flush_counter_metrics(self, interval, timestamp):
-        metrics = []
-        events = 0
         for key, count in self.counter_metrics.iteritems():
             self.counter_metrics[key] = 0
 
             value = count / interval
-            metrics.append((self.stats_prefix + key, value, timestamp))
-            metrics.append((self.count_prefix + key, count, timestamp))
-            events += 1
-
-        return (metrics, events)
+            yield ((self.stats_prefix + key, value, timestamp),
+                   (self.count_prefix + key, count, timestamp))
 
     def flush_timer_metrics(self, percent, timestamp):
-        metrics = []
-        events = 0
-
         threshold_value = ((100 - percent) / 100.0)
         for key, timers in self.timer_metrics.iteritems():
             count = len(timers)
@@ -318,78 +321,52 @@ class MessageProcessor(BaseMessageProcessor):
                          ".upper_%s" % percent: threshold_upper,
                          ".lower": lower,
                          ".count": count}
-                for item, value in items.iteritems():
-                    metrics.append((self.timer_prefix + key + item,
-                                    value, timestamp))
-                events += 1
-
-        return (metrics, events)
+                yield sorted((self.timer_prefix + key + item, value, timestamp)
+                             for item, value in items.iteritems())
 
     def flush_gauge_metrics(self, timestamp):
-        metrics = []
-        events = 0
         for metric in self.gauge_metrics:
             value = metric[0]
             key = metric[1]
 
-            metrics.append((self.gauge_prefix + key + ".value",
-                            value, timestamp))
-            events += 1
+            yield ((self.gauge_prefix + key + ".value", value, timestamp),)
 
         self.gauge_metrics.clear()
 
-        return (metrics, events)
-
     def flush_meter_metrics(self, timestamp):
-        metrics = []
-        events = 0
         for metric in self.meter_metrics.itervalues():
             messages = metric.report(timestamp)
-            metrics.extend(messages)
-            events += 1
-
-        return (metrics, events)
+            yield messages
 
     def flush_plugin_metrics(self, interval, timestamp):
-        metrics = []
-        events = 0
-
         for metric in self.plugin_metrics.itervalues():
             messages = metric.flush(interval, timestamp)
-            metrics.extend(messages)
-            events += 1
+            yield messages
 
-        return (metrics, events)
-
-    def flush_metrics_summary(self, messages, num_stats,
-                              per_metric, timestamp):
-
-        messages.append((self.internal_metrics_prefix + "numStats",
-                         num_stats, timestamp))
+    def flush_metrics_summary(self, num_stats, per_metric, timestamp):
+        yield ((self.internal_metrics_prefix + "numStats",
+                num_stats, timestamp),)
 
         self.last_flush_duration = 0
         for name, (value, duration) in per_metric.iteritems():
-            messages.extend([
-                (self.internal_metrics_prefix +
-                 "flush.%s.count" % name,
-                 value, timestamp),
-                (self.internal_metrics_prefix +
-                 "flush.%s.duration" % name,
-                 duration * 1000, timestamp)])
+            yield ((self.internal_metrics_prefix +
+                    "flush.%s.count" % name,
+                    value, timestamp),
+                   (self.internal_metrics_prefix +
+                    "flush.%s.duration" % name,
+                    duration * 1000, timestamp))
             log.msg("Flushed %d %s metrics in %.6f" %
                     (value, name, duration))
             self.last_flush_duration += duration
 
         self.last_process_duration = 0
         for metric_type, duration in self.process_timings.iteritems():
-            messages.extend([
-                (self.internal_metrics_prefix +
-                 "receive.%s.count" %
-                 metric_type, self.by_type[metric_type], timestamp),
-                (self.internal_metrics_prefix +
-                 "receive.%s.duration" %
-                 metric_type, duration * 1000, timestamp)
-                ])
+            yield ((self.internal_metrics_prefix +
+                    "receive.%s.count" %
+                    metric_type, self.by_type[metric_type], timestamp),
+                   (self.internal_metrics_prefix +
+                    "receive.%s.duration" %
+                    metric_type, duration * 1000, timestamp))
             log.msg("Processing %d %s metrics took %.6f" %
                     (self.by_type[metric_type], metric_type, duration))
             self.last_process_duration += duration

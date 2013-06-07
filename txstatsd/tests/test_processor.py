@@ -189,22 +189,25 @@ class ProcessorStatsTest(TestCase):
         flushed.
         """
         self.timer.set([0,
-                        0, 1, # counter
-                        1, 3, # timer
-                        3, 6, # gauge
-                        6, 10, # meter
-                        10, 15, # plugin
+                        0, 1,  # counter
+                        1, 3,  # timer
+                        3, 6,  # gauge
+                        6, 10,  # meter
+                        10, 15,  # plugin
                         ])
-        def flush_metrics_summary(messages, num_stats, per_metric, timestamp):
+
+        def flush_metrics_summary(num_stats, per_metric, timestamp):
             self.assertEqual((0, 1), per_metric["counter"])
             self.assertEqual((0, 2), per_metric["timer"])
             self.assertEqual((0, 3), per_metric["gauge"])
             self.assertEqual((0, 4), per_metric["meter"])
             self.assertEqual((0, 5), per_metric["plugin"])
+            yield ()
+
         self.addCleanup(setattr, self.processor, "flush_metrics_summary",
                         self.processor.flush_metrics_summary)
         self.processor.flush_metrics_summary = flush_metrics_summary
-        self.processor.flush()
+        list(self.processor.flush())
 
     def test_flush_metrics_summary(self):
         """
@@ -215,14 +218,15 @@ class ProcessorStatsTest(TestCase):
         self.processor.process_timings = {"c": 1}
         self.processor.by_type = {"c": 42}
         messages = []
-        self.processor.flush_metrics_summary(messages, 1, per_metric, 42)
+        map(messages.extend, self.processor.flush_metrics_summary(
+            1, per_metric, 42))
         self.assertEqual(5, len(messages))
         self.assertEqual([('statsd.numStats', 1, 42),
                           ('statsd.flush.counter.count', 10, 42),
                           ('statsd.flush.counter.duration', 1000, 42),
                           ('statsd.receive.c.count', 42, 42),
                           ('statsd.receive.c.duration', 1000, 42)],
-                          messages)
+                         messages)
         self.assertEquals({}, self.processor.process_timings)
         self.assertEquals({}, self.processor.by_type)
 
@@ -238,7 +242,8 @@ class FlushMessagesTest(TestCase):
         Flushing the message processor when there are no stats available should
         still produce one message where C{statsd.numStats} is set to zero.
         """
-        self.assertEqual(("statsd.numStats", 0, 42), self.processor.flush()[0])
+        self.assertEqual(("statsd.numStats", 0, 42),
+                         list(self.processor.flush())[0])
 
     def test_flush_counter(self):
         """
@@ -246,7 +251,7 @@ class FlushMessagesTest(TestCase):
         normalized to the default interval.
         """
         self.processor.counter_metrics["gorets"] = 42
-        messages = self.processor.flush()
+        messages = list(self.processor.flush())
         self.assertEqual(("stats.gorets", 4, 42), messages[0])
         self.assertEqual(("stats_counts.gorets", 42, 42), messages[1])
         self.assertEqual(("statsd.numStats", 1, 42), messages[2])
@@ -258,7 +263,7 @@ class FlushMessagesTest(TestCase):
         case the counter value will be unchanged.
         """
         self.processor.counter_metrics["gorets"] = 42
-        messages = self.processor.flush(interval=1000)
+        messages = list(self.processor.flush(interval=1000))
         self.assertEqual(("stats.gorets", 42, 42), messages[0])
         self.assertEqual(("stats_counts.gorets", 42, 42), messages[1])
         self.assertEqual(("statsd.numStats", 1, 42), messages[2])
@@ -271,7 +276,7 @@ class FlushMessagesTest(TestCase):
         reset after flush is called.
         """
         self.processor.timer_metrics["glork"] = [24]
-        messages = self.processor.flush()
+        messages = list(self.processor.flush())
         self.assertEqual(("stats.timers.glork.count", 1, 42), messages[0])
         self.assertEqual(("stats.timers.glork.lower", 24, 42), messages[1])
         self.assertEqual(("stats.timers.glork.mean", 24, 42), messages[2])
@@ -290,7 +295,7 @@ class FlushMessagesTest(TestCase):
         - mean will be the mean value within the 90th percentile
         """
         self.processor.timer_metrics["glork"] = [4, 8, 15, 16, 23, 42]
-        messages = self.processor.flush()
+        messages = list(self.processor.flush())
         self.assertEqual(("stats.timers.glork.count", 6, 42), messages[0])
         self.assertEqual(("stats.timers.glork.lower", 4, 42), messages[1])
         self.assertEqual(("stats.timers.glork.mean", 13, 42), messages[2])
@@ -312,7 +317,7 @@ class FlushMessagesTest(TestCase):
         - mean will be the mean value within the 50th percentile
         """
         self.processor.timer_metrics["glork"] = [4, 8, 15, 16, 23, 42]
-        messages = self.processor.flush(percent=50)
+        messages = list(self.processor.flush(percent=50))
         self.assertEqual(("stats.timers.glork.count", 6, 42), messages[0])
         self.assertEqual(("stats.timers.glork.lower", 4, 42), messages[1])
         self.assertEqual(("stats.timers.glork.mean", 9, 42), messages[2])
@@ -329,7 +334,7 @@ class FlushMessagesTest(TestCase):
 
         self.processor.process("gorets:9.6|g")
 
-        messages = self.processor.flush()
+        messages = list(self.processor.flush())
         self.assertEqual(
             ("stats.gauge.gorets.value", 9.6, 42), messages[0])
         self.assertEqual(
@@ -344,14 +349,14 @@ class FlushMessagesTest(TestCase):
 
         self.processor.process("gorets:item|pd")
 
-        messages = self.processor.flush()
+        messages = list(self.processor.flush())
         self.assertEqual(("stats.pdistinct.gorets.count", 1, 42), messages[0])
         self.assertEqual(("stats.pdistinct.gorets.count_1day",
-                        5552568545, 42), messages[1])
+                          5552568545, 42), messages[1])
         self.assertEqual(("stats.pdistinct.gorets.count_1hour",
-                        5552568545, 42), messages[2])
+                          5552568545, 42), messages[2])
         self.assertEqual(("stats.pdistinct.gorets.count_1min",
-                        5552568545, 42), messages[3])
+                          5552568545, 42), messages[3])
 
     def test_flush_plugin_arguments(self):
         """Test the passing of arguments for flush."""
@@ -362,9 +367,9 @@ class FlushMessagesTest(TestCase):
                 return []
 
         self.processor.plugin_metrics["somemetric"] = FakeMetric()
-        self.processor.flush(41000)
-        self.assertEquals((41, 42),
-            self.processor.plugin_metrics["somemetric"].data)
+        list(self.processor.flush(41000))
+        self.assertEquals(
+            (41, 42), self.processor.plugin_metrics["somemetric"].data)
 
 
 class FlushMeterMetricMessagesTest(TestCase):
@@ -384,7 +389,7 @@ class FlushMeterMetricMessagesTest(TestCase):
         self.processor.process("gorets:3.0|m")
 
         self.time_now += 1
-        messages = self.processor.flush()
+        messages = list(self.processor.flush())
         self.assertEqual(
             ("stats.meter.gorets.count", 3.0, self.time_now),
             messages[0])
@@ -396,7 +401,7 @@ class FlushMeterMetricMessagesTest(TestCase):
             messages[2])
 
         self.time_now += 60
-        messages = self.processor.flush()
+        messages = list(self.processor.flush())
         self.assertEqual(
             ("stats.meter.gorets.count", 3.0, self.time_now),
             messages[0])
