@@ -30,6 +30,7 @@ class FakeMeterMetric(object):
     def report(self, *args):
         return [('Sample report', 1, 2)]
 
+
 class TestLogger(object):
     def __init__(self):
         self.log = ''
@@ -63,7 +64,7 @@ class TestLoggingMessageProcessor(TestCase):
         processor = LoggingMessageProcessor(logger)
         metric = FakeMeterMetric()
         processor.meter_metrics['test'] = metric
-        processor.flush()
+        list(processor.flush())
         expected = ["Out: %s %s %s" % message
                     for message in metric.report()]
         self.assertFalse(set(expected).difference(logger.log.splitlines()))
@@ -75,7 +76,7 @@ class TestLoggingMessageProcessor(TestCase):
             time_function=lambda: 42)
         msg_in = "gorets:17|pd"
         processor.process(msg_in)
-        processor.flush()
+        list(processor.flush())
         messages = processor.plugin_metrics['gorets'].flush(
             10, processor.time_function())
         expected = ["In: %s" % msg_in] + ["Out: %s %s %s" % message

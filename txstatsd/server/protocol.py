@@ -31,8 +31,8 @@ class StatsDServerProtocol(DatagramProtocol):
     server via TCP.
     """
 
-    def __init__(self, processor,
-                 monitor_message=None, monitor_response=None):
+    def __init__(self, processor, monitor_message=None,
+                 monitor_response=None):
         self.processor = processor
         self.monitor_message = monitor_message
         self.monitor_response = monitor_response
@@ -42,9 +42,10 @@ class StatsDServerProtocol(DatagramProtocol):
         if data == self.monitor_message:
             # Send the expected response to the
             # monitoring agent.
-            self.transport.write(self.monitor_response, (host, port))
-        else:
-            self.processor.process(data)
+            return self.transport.write(
+                self.monitor_response, (host, port))
+        return self.transport.reactor.callLater(
+            0, self.processor.process, data)
 
 
 class StatsDTCPServerProtocol(LineReceiver):
@@ -54,8 +55,8 @@ class StatsDTCPServerProtocol(LineReceiver):
     server via TCP.
     """
 
-    def __init__(self, processor,
-                 monitor_message=None, monitor_response=None):
+    def __init__(self, processor, monitor_message=None,
+                 monitor_response=None):
         self.processor = processor
         self.monitor_message = monitor_message
         self.monitor_response = monitor_response
@@ -65,20 +66,20 @@ class StatsDTCPServerProtocol(LineReceiver):
         if data == self.monitor_message:
             # Send the expected response to the
             # monitoring agent.
-            self.transport.write(self.monitor_response)
-        else:
-            self.processor.process(data)
+            return self.transport.write(self.monitor_response)
+        return self.transport.reactor.callLater(
+            0, self.processor.process, data)
 
 
 class StatsDTCPServerFactory(Factory):
 
-    def __init__(self, processor,
-                 monitor_message=None, monitor_response=None):
+    def __init__(self, processor, monitor_message=None,
+                 monitor_response=None):
         self.processor = processor
         self.monitor_message = monitor_message
         self.monitor_response = monitor_response
 
     def buildProtocol(self, addr):
-        return StatsDTCPServerProtocol(self.processor,
-            self.monitor_message, self.monitor_response)
-
+        return StatsDTCPServerProtocol(
+            self.processor, self.monitor_message,
+            self.monitor_response)

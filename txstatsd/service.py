@@ -41,7 +41,7 @@ from txstatsd.server.protocol import (
     StatsDServerProtocol, StatsDTCPServerFactory)
 from txstatsd.server.router import Router
 from txstatsd.server import httpinfo
-from txstatsd.report import ReportingService
+from txstatsd.report import ReportingService, ReactorInspectorService
 from txstatsd.itxstatsd import IMetricFactory
 from twisted.application.service import Service
 from twisted.internet import task
@@ -211,19 +211,26 @@ class StatsDService(Service):
         self.processor = processor
         self.flush_interval = flush_interval
         self.flush_task = task.LoopingCall(self.flushProcessor)
+        self.coop = task.Cooperator()
         if clock is not None:
             self.flush_task.clock = clock
 
     def flushProcessor(self):
         """Flush messages queued in the processor to Graphite."""
-        flushed = 0
         start = time.time()
-        for metric, value, timestamp in self.processor.flush(
-                interval=self.flush_interval):
-            self.carbon_client.sendDatapoint(metric, (timestamp, value))
-            flushed += 1
-        log.msg("Flushed total %d metrics in %.6f" %
-                (flushed, time.time() - start))
+        interval = self.flush_interval
+        flush = self.processor.flush
+
+        def doWork():
+            flushed = 0
+            for metric, value, timestamp in flush(interval=interval):
+                yield self.carbon_client.sendDatapoint(
+                    metric, (timestamp, value))
+                flushed += 1
+            log.msg("Flushed total %d metrics in %.6f" %
+                    (flushed, time.time() - start))
+
+        self.coop.coiterate(doWork())
 
     def startService(self):
         self.flush_task.start(self.flush_interval / 1000, False)
@@ -276,7 +283,7 @@ def createService(options):
         # LoggingMessageProcessor supersedes
         #  any other processor class in "dump-mode"
         assert not hasattr(log, 'info')
-        log.info = log.msg # for compatibility with LMP logger interface
+        log.info = log.msg  # for compatibility with LMP logger interface
         processor = functools.partial(LoggingMessageProcessor, logger=log)
 
     if options["statsd-compliance"]:
@@ -315,6 +322,11 @@ def createService(options):
             process.report_reactor_stats(reactor), 60, metrics.gauge)
         reports = [name.strip() for name in options["report"].split(",")]
         for report_name in reports:
+            if report_name == "reactor":
+                inspector = ReactorInspectorService(reactor, metrics,
+                                                    loop_time=0.05)
+                inspector.setServiceParent(root_service)
+
             for reporter in getattr(process, "%s_STATS" %
                                     report_name.upper(), ()):
                 reporting.schedule(reporter, 60, metrics.gauge)
@@ -343,12 +355,12 @@ def createService(options):
 
     if options["listen-tcp-port"] is not None:
         statsd_tcp_server_factory = StatsDTCPServerFactory(
-                input_router,
-                monitor_message=options["monitor-message"],
-                monitor_response=options["monitor-response"])
+            input_router,
+            monitor_message=options["monitor-message"],
+            monitor_response=options["monitor-response"])
 
         listener = TCPServer(options["listen-tcp-port"],
-            statsd_tcp_server_factory)
+                             statsd_tcp_server_factory)
         listener.setServiceParent(root_service)
 
     httpinfo_service = httpinfo.makeService(options, processor, statsd_service)

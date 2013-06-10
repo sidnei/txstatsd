@@ -60,8 +60,9 @@ class ConfigurableMessageProcessor(MessageProcessor):
 
     def compose_timer_metric(self, key, duration):
         if not key in self.timer_metrics:
-            metric = TimerMetricReporter(key,
-                wall_time_func=self.time_function, prefix=self.message_prefix)
+            metric = TimerMetricReporter(
+                key, wall_time_func=self.time_function,
+                prefix=self.message_prefix)
             self.timer_metrics[key] = metric
         self.timer_metrics[key].update(duration)
 
@@ -93,31 +94,16 @@ class ConfigurableMessageProcessor(MessageProcessor):
         self.meter_metrics[key].mark(value)
 
     def flush_counter_metrics(self, interval, timestamp):
-        metrics = []
-        events = 0
         for metric in self.counter_metrics.itervalues():
             messages = metric.report(timestamp)
-            metrics.extend(messages)
-            events += 1
-
-        return (metrics, events)
+            yield messages
 
     def flush_gauge_metrics(self, timestamp):
-        metrics = []
-        events = 0
         for metric in self.gauge_metrics.itervalues():
             messages = metric.report(timestamp)
-            metrics.extend(messages)
-            events += 1
-
-        return (metrics, events)
+            yield messages
 
     def flush_timer_metrics(self, percent, timestamp):
-        metrics = []
-        events = 0
         for metric in self.timer_metrics.itervalues():
             messages = metric.report(timestamp)
-            metrics.extend(messages)
-            events += 1
-
-        return (metrics, events)
+            yield messages
