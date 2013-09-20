@@ -336,8 +336,6 @@ class MessageProcessor(BaseMessageProcessor):
                             value, timestamp))
             events += 1
 
-        self.gauge_metrics.clear()
-
         return (metrics, events)
 
     def flush_meter_metrics(self, timestamp):
