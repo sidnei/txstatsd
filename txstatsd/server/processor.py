@@ -25,7 +25,6 @@ import time
 import logging
 
 from twisted.python import log
-from twisted.internet.task import Cooperator
 
 from txstatsd.metrics.metermetric import MeterMetricReporter
 
@@ -330,8 +329,6 @@ class MessageProcessor(BaseMessageProcessor):
             key = metric[1]
 
             yield ((self.gauge_prefix + key + ".value", value, timestamp),)
-
-        self.gauge_metrics.clear()
 
     def flush_meter_metrics(self, timestamp):
         for metric in self.meter_metrics.itervalues():

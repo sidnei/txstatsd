@@ -339,7 +339,16 @@ class FlushMessagesTest(TestCase):
             ("stats.gauge.gorets.value", 9.6, 42), messages[0])
         self.assertEqual(
             ("statsd.numStats", 1, 42), messages[1])
-        self.assertEqual(0, len(self.processor.gauge_metrics))
+
+        # ensure the gauge value remains after the flush.
+        self.assertEqual(1, len(self.processor.gauge_metrics))
+
+        # ensure that subsequent flushes continue to report the gauge value
+        messages = list(self.processor.flush())
+        self.assertEqual(
+            ("stats.gauge.gorets.value", 9.6, 42), messages[0])
+        self.assertEqual(
+            ("statsd.numStats", 1, 42), messages[1])
 
     def test_flush_distinct_metric(self):
         """
