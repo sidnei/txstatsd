@@ -167,7 +167,7 @@ class TwistedStatsDClient(object):
 
         instance = cls(
             host=host, port=port, connect_callback=connect_callback,
-            disconnect_callback=disconnect_callback)
+            disconnect_callback=disconnect_callback, reactor=reactor)
 
         if resolver_errback is None:
             resolver_errback = log.err
