@@ -114,7 +114,7 @@ class TransportGateway(object):
 class TwistedStatsDClient(object):
 
     def __init__(self, host, port, connect_callback=None,
-                 disconnect_callback=None):
+                 disconnect_callback=None, reactor=None):
         """Avoid using this initializer directly; Instead, use the create()
         static method, otherwise the messages won't be really delivered.
 
@@ -126,7 +126,8 @@ class TwistedStatsDClient(object):
         @param connect_callback: The callback to invoke on connection.
         @param disconnect_callback: The callback to invoke on disconnection.
         """
-        from twisted.internet import reactor
+        if reactor is None:
+            from twisted.internet import reactor
 
         self.reactor = reactor
 
@@ -147,7 +148,7 @@ class TwistedStatsDClient(object):
 
     @staticmethod
     def create(host, port, connect_callback=None, disconnect_callback=None,
-               resolver_errback=None):
+               resolver_errback=None, reactor=None):
         """Create an instance that resolves the host to an IP asynchronously.
 
         Will queue all messages while the host is not yet resolved.
@@ -161,7 +162,8 @@ class TwistedStatsDClient(object):
             issues occur resolving the supplied C{host}.
         @param connect_callback: The callback to invoke on connection.
         @param disconnect_callback: The callback to invoke on disconnection."""
-        from twisted.internet import reactor
+        if reactor is None:
+            from twisted.internet import reactor
 
         instance = TwistedStatsDClient(
             host=host, port=port, connect_callback=connect_callback,

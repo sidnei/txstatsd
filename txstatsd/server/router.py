@@ -70,15 +70,16 @@ class StopProcessingException(Exception):
 
 class TCPRedirectService(Service):
 
-    def __init__(self, host, port, factory):
+    def __init__(self, host, port, factory, reactor=None):
         self.host = host
         self.port = port
         self.factory = factory
+        if reactor is None:
+            from twisted.internet import reactor
+        self.reactor = reactor
 
     def startService(self):
-        from twisted.internet import reactor
-
-        reactor.connectTCP(self.host, self.port, self.factory)
+        self.reactor.connectTCP(self.host, self.port, self.factory)
         return Service.startService(self)
 
     def stopService(self):
@@ -90,17 +91,18 @@ class TCPRedirectService(Service):
 
 class TCPRedirectClientFactory(ReconnectingClientFactory):
 
-    def __init__(self, callback=None):
+    def __init__(self, callback=None, reactor=None):
         self.callback = callback
         self.protocol = None
+        if reactor is None:
+            from twisted.internet import reactor
+        self.reactor = reactor
 
     def buildProtocol(self, addr):
-        from twisted.internet import reactor
-
         self.resetDelay()
         self.protocol = TCPRedirectProtocol()
         if self.callback:
-            reactor.callLater(0, self.callback)
+            self.reactor.callLater(0, self.callback)
             self.callback = None
 
         return self.protocol
