@@ -146,9 +146,9 @@ class TwistedStatsDClient(object):
     def __str__(self):
         return "%s:%d" % (self.host, self.port)
 
-    @staticmethod
-    def create(host, port, connect_callback=None, disconnect_callback=None,
-               resolver_errback=None, reactor=None):
+    @classmethod
+    def create(cls, host, port, connect_callback=None,
+               disconnect_callback=None, resolver_errback=None, reactor=None):
         """Create an instance that resolves the host to an IP asynchronously.
 
         Will queue all messages while the host is not yet resolved.
@@ -165,7 +165,7 @@ class TwistedStatsDClient(object):
         if reactor is None:
             from twisted.internet import reactor
 
-        instance = TwistedStatsDClient(
+        instance = cls(
             host=host, port=port, connect_callback=connect_callback,
             disconnect_callback=disconnect_callback)
 
