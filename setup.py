@@ -19,32 +19,14 @@
 # TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 # SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-from distutils.command.install import install
 from glob import glob
-import os
 
 from txstatsd import version
 
-# If setuptools is present, use it to find_packages()
 extra_setup_args = {}
-try:
-    import setuptools
-    from setuptools import find_packages
-    from setuptools import setup
-except ImportError:
-    from distutils.core import setup
-
-    def find_packages():
-        """
-        Compatibility wrapper.
-
-        Taken from storm setup.py.
-        """
-        packages = []
-        for directory, subdirectories, files in os.walk("txstatsd"):
-            if '__init__.py' in files:
-                packages.append(directory.replace(os.sep, '.'))
-        return packages
+from setuptools.command.install import install
+from setuptools import find_packages
+from setuptools import setup
 
 long_description = """
 Twisted-based implementation of a statsd-compatible server and client.
@@ -64,7 +46,7 @@ class TxPluginInstaller(install):
         list(getPlugins(IPlugin))
 
 setup(
-    cmdclass = {'install': TxPluginInstaller},
+    cmdclass={'install': TxPluginInstaller},
     name="txStatsD",
     version=version.txstatsd,
     description="A network daemon for aggregating statistics",
@@ -86,4 +68,3 @@ setup(
        ],
     **extra_setup_args
     )
-
