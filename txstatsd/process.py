@@ -110,19 +110,19 @@ class ProcessReport(object):
 
     def get_memory_and_cpu(self, prefix="proc"):
         """Report memory and CPU stats for C{process}."""
-        vsize, rss = self.process.get_memory_info()
-        result = {prefix + ".cpu.percent": self.process.get_cpu_percent(),
+        vsize, rss = self.process.memory_info()
+        result = {prefix + ".cpu.percent": self.process.cpu_percent(),
                   prefix + ".memory.percent":
-                    self.process.get_memory_percent(),
+                    self.process.memory_percent(),
                   prefix + ".memory.vsize": vsize,
                   prefix + ".memory.rss": rss}
-        if getattr(self.process, "get_num_threads", None) is not None:
-            result[prefix + ".threads"] = self.process.get_num_threads()
+        if getattr(self.process, "num_threads", None) is not None:
+            result[prefix + ".threads"] = self.process.num_threads()
         return result
 
     def get_cpu_counters(self, prefix="proc"):
         """Report memory and CPU counters for C{process}."""
-        utime, stime = self.process.get_cpu_times()
+        utime, stime = self.process.cpu_times()
         result = {prefix + ".cpu.user": utime,
                   prefix + ".cpu.system": stime}
         return result
@@ -130,9 +130,9 @@ class ProcessReport(object):
     def get_io_counters(self, prefix="proc.io"):
         """Report IO statistics for C{process}."""
         result = {}
-        if getattr(self.process, "get_io_counters", None) is not None:
+        if getattr(self.process, "io_counters", None) is not None:
             (read_count, write_count,
-             read_bytes, write_bytes) = self.process.get_io_counters()
+             read_bytes, write_bytes) = self.process.io_counters()
             result.update({
                 prefix + ".read.count": read_count,
                 prefix + ".write.count": write_count,
@@ -143,8 +143,8 @@ class ProcessReport(object):
     def get_net_stats(self, prefix="proc.net"):
         """Report active connection statistics for C{process}."""
         result = {}
-        if getattr(self.process, "get_connections", None) is not None:
-            for connection in self.process.get_connections():
+        if getattr(self.process, "connections", None) is not None:
+            for connection in self.process.connections():
                 fd, family, _type, laddr, raddr, status = connection
                 if _type == socket.SOCK_STREAM:
                     key = prefix + ".status.%s" % status.lower()

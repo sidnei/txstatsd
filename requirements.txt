@@ -1,7 +1,6 @@
-Twisted==11.1.0
-carbon==0.9.9
-whisper==0.9.9
-mock==1.0
-psutil==0.4.1
-wsgiref==0.1.2
-zope.interface==3.8.0
+Twisted>=11.1.0,<=15.5.0
+carbon>=0.9.9,<=0.9.15
+whisper>=0.9.9,<=0.9.15
+mock>=1.0,<=1.3.0
+psutil>=2.0.0,<=3.4.2
+wsgiref>=0.1.2,<=0.9.15
