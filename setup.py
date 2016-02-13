@@ -20,7 +20,6 @@
 # SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 from glob import glob
-from sys import version_info
 
 from txstatsd import version
 
@@ -46,8 +45,6 @@ class TxPluginInstaller(install):
 
         list(getPlugins(IPlugin))
 
-twisted_version = 'Twisted>=11.1.0,<=15.5.0' if version_info >= (2,7) else 'Twisted==11.1.0'
-
 setup(
     cmdclass={'install': TxPluginInstaller},
     name="txStatsD",
@@ -56,7 +53,7 @@ setup(
     author="txStatsD Developers",
     url="https://launchpad.net/txstatsd",
     license="MIT",
-    install_requires=[twisted_version],
+    install_requires=['Twisted>=11.1.0,<=15.4.0'],
     packages=find_packages() + ["twisted.plugins"],
     scripts=glob("./bin/*"),
     long_description=long_description,
