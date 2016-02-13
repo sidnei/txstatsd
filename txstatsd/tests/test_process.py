@@ -181,15 +181,15 @@ class TestSystemPerformance(TestCase):
         the number of threads will not be included in the output.
         """
         process = psutil.Process(os.getpid())
-        vsize, rss = process.get_memory_info()
-        cpu_percent = process.get_cpu_percent()
-        memory_percent = process.get_memory_percent()
+        vsize, rss = process.memory_info()
+        cpu_percent = process.cpu_percent()
+        memory_percent = process.memory_percent()
 
         proc = mock.Mock()
-        proc.get_memory_info.return_value = (vsize, rss)
-        proc.get_cpu_percent.return_value = cpu_percent
-        proc.get_memory_percent.return_value = memory_percent
-        proc.get_num_threads = None
+        proc.memory_info.return_value = (vsize, rss)
+        proc.cpu_percent.return_value = cpu_percent
+        proc.memory_percent.return_value = memory_percent
+        proc.num_threads = None
         result = ProcessReport(process=proc).get_memory_and_cpu()
         self.assertEqual(cpu_percent, result["proc.cpu.percent"])
         self.assertEqual(vsize, result["proc.memory.vsize"])
@@ -202,12 +202,12 @@ class TestSystemPerformance(TestCase):
         Process cpu counters are collected through psutil.
         """
         process = psutil.Process(os.getpid())
-        utime, stime = process.get_cpu_times()
+        utime, stime = process.cpu_times()
 
         proc = mock.Mock()
-        proc.get_cpu_times.return_value = (utime, stime)
+        proc.cpu_times.return_value = (utime, stime)
         result = ProcessReport(process=proc).get_cpu_counters()
-        proc.get_cpu_times.assert_called_once_with()
+        proc.cpu_times.assert_called_once_with()
         self.assertEqual(utime, result["proc.cpu.user"])
         self.assertEqual(stime, result["proc.cpu.system"])
 
@@ -220,20 +220,20 @@ class TestSystemPerformance(TestCase):
 
         """
         process = psutil.Process(os.getpid())
-        vsize, rss = process.get_memory_info()
-        cpu_percent = process.get_cpu_percent()
-        memory_percent = process.get_memory_percent()
+        vsize, rss = process.memory_info()
+        cpu_percent = process.cpu_percent()
+        memory_percent = process.memory_percent()
 
         proc = mock.Mock()
-        proc.get_memory_info.return_value = (vsize, rss)
-        proc.get_cpu_percent.return_value = cpu_percent
-        proc.get_memory_percent.return_value = memory_percent
-        proc.get_num_threads.return_value = 1
+        proc.memory_info.return_value = (vsize, rss)
+        proc.cpu_percent.return_value = cpu_percent
+        proc.memory_percent.return_value = memory_percent
+        proc.num_threads.return_value = 1
         result = ProcessReport(process=proc).get_memory_and_cpu()
-        proc.get_memory_info.assert_called_once_with()
-        proc.get_cpu_percent.assert_called_once_with()
-        proc.get_memory_percent.assert_called_once_with()
-        proc.get_num_threads.assert_called_once_with()
+        proc.memory_info.assert_called_once_with()
+        proc.cpu_percent.assert_called_once_with()
+        proc.memory_percent.assert_called_once_with()
+        proc.num_threads.assert_called_once_with()
 
 
         self.assertEqual(cpu_percent, result["proc.cpu.percent"])
@@ -247,7 +247,7 @@ class TestSystemPerformance(TestCase):
         # If the version of psutil doesn't have the C{get_io_counters},
         # then io stats are not included in the output.
         proc = mock.Mock()
-        proc.get_io_counters = None
+        proc.io_counters = None
         result = ProcessReport(process=proc).get_io_counters()
         self.failIf("proc.io.read.count" in result)
         self.failIf("proc.io.write.count" in result)
@@ -264,9 +264,9 @@ class TestSystemPerformance(TestCase):
         io_counters = (10, 42, 125, 16)
 
         proc = mock.Mock()
-        proc.get_io_counters.return_value = io_counters
+        proc.io_counters.return_value = io_counters
         result = ProcessReport(process=proc).get_io_counters()
-        proc.get_io_counters.assert_called_once_with()
+        proc.io_counters.assert_called_once_with()
         self.assertEqual(10, result["proc.io.read.count"])
         self.assertEqual(42, result["proc.io.write.count"])
         self.assertEqual(125, result["proc.io.read.bytes"])
@@ -282,7 +282,7 @@ class TestSystemPerformance(TestCase):
         # If the version of psutil doesn't have the C{get_io_counters},
         # then io stats are not included in the output.
         proc = mock.Mock()
-        proc.get_connections = None
+        proc.connections = None
         result = ProcessReport(process=proc).get_net_stats()
         self.failIf("proc.net.status.established" in result)
 
@@ -305,9 +305,9 @@ class TestSystemPerformance(TestCase):
             ]
 
         proc = mock.Mock()
-        proc.get_connections.return_value = connections
+        proc.connections.return_value = connections
         result = ProcessReport(process=proc).get_net_stats()
-        proc.get_connections.assert_called_once_with()
+        proc.connections.assert_called_once_with()
         self.assertEqual(2, result["proc.net.status.established"])
         self.assertEqual(1, result["proc.net.status.closing"])
         self.assertEqual(1, result["proc.net.status.syn_sent"])

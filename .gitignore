@@ -1,0 +1,9 @@
+*.pyc
+.cache
+.python-version
+.tox
+.venv
+build/
+twisted/plugins/dropin.cache
+txStatsD.egg-info/
+_trial_temp/
