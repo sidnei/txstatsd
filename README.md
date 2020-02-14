@@ -5,6 +5,8 @@ Dependencies
 
 * The twisted python package (python-twisted on Debian or similar systems)
 
+[![Build Status](https://travis-ci.org/sidnei/txstatsd.svg?branch=master)](https://travis-ci.org/sidnei/txstatsd)
+
 Things present here
 -------------------
 
