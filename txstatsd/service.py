@@ -252,7 +252,7 @@ def report_client_manager_stats():
     return current_stats
 
 
-def createService(options):
+def createService(options, reactor=None):
     """Create a txStatsD service."""
     from carbon.routers import ConsistentHashingRouter
     from carbon.client import CarbonClientManager
@@ -316,7 +316,8 @@ def createService(options):
 
     if options["report"] is not None:
         from txstatsd import process
-        from twisted.internet import reactor
+        if reactor is None:
+            from twisted.internet import reactor
 
         reporting.schedule(
             process.report_reactor_stats(reactor), 60, metrics.gauge)
