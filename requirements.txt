@@ -1,4 +1,4 @@
-Twisted==11.1.0
+Twisted==19.7.0
 carbon==0.9.9
 whisper==0.9.9
 mock==1.0
