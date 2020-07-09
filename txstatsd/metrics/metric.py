@@ -28,7 +28,7 @@ class Metric(object):
     metrics are derived.
     """
 
-    def __init__(self, connection, name, sample_rate=1):
+    def __init__(self, connection, name, sample_rate=1, tags=None):
         """Construct a metric that reports samples to the supplied
         C{connection}.
 
@@ -41,6 +41,7 @@ class Metric(object):
         self.connection = connection
         self.name = name
         self.sample_rate = sample_rate
+        self.tags = tags
 
     def clear(self):
         """Responsibility of the specialized metrics."""
@@ -57,7 +58,11 @@ class Metric(object):
                 return
             data += "|@%s" % (self.sample_rate,)
 
-        data = self.name + ":" + data
+        data = "%s:%s%s" % (
+            self.name,
+            data,
+            ("|#" + ",".join(self.tags)) if self.tags else ""
+        )
 
         self.write(data)
 
