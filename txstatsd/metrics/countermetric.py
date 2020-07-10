@@ -27,7 +27,7 @@ from txstatsd.metrics.metric import Metric
 class CounterMetric(Metric):
     """An incrementing and decrementing counter metric."""
 
-    def __init__(self, connection, name, sample_rate=1):
+    def __init__(self, connection, name, sample_rate=1, tags=None):
         """Construct a metric that reports samples to the supplied
         C{connection}.
 
@@ -37,7 +37,8 @@ class CounterMetric(Metric):
         @param sample_rate: Restrict the number of samples sent
             to the StatsD server based on the supplied C{sample_rate}.
         """
-        Metric.__init__(self, connection, name, sample_rate=sample_rate)
+        Metric.__init__(self, connection, name, sample_rate=sample_rate,
+                        tags=tags)
 
         self._count = 0
 

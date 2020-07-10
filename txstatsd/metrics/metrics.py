@@ -27,8 +27,8 @@ from txstatsd.metrics.metric import Metric
 
 
 class GenericMetric(Metric):
-    def __init__(self, connection, key, name):
-        super(GenericMetric, self).__init__(connection, name)
+    def __init__(self, connection, key, name, tags):
+        super(GenericMetric, self).__init__(connection, name, tags=tags)
         self.key = key
 
     def mark(self, value, extra=None):
@@ -54,18 +54,19 @@ class Metrics(object):
         self._metrics = {}
         self.last_time = 0
 
-    def report(self, name, value, metric_type, extra=None):
+    def report(self, name, value, metric_type, extra=None, tags=None):
         """Report a generic metric.
 
         Used for server side plugins without client support.
         """
-        name = self.fully_qualify_name(name)
-        if not name in self._metrics:
+        key, name = self.key_and_fqn(name, tags)
+        if key not in self._metrics:
             metric = GenericMetric(self.connection,
-                                        metric_type,
-                                        name)
-            self._metrics[name] = metric
-        self._metrics[name].mark(value, extra)
+                                   metric_type,
+                                   name,
+                                   tags)
+            self._metrics[key] = metric
+        self._metrics[key].mark(value, extra)
 
     def sli(self, name, duration, size=None):
         """Report a service level metric.
@@ -84,45 +85,49 @@ class Metrics(object):
         """
         self.report(name, "error", "sli")
 
-    def gauge(self, name, value, sample_rate=1):
+    def gauge(self, name, value, sample_rate=1, tags=None):
         """Report an instantaneous reading of a particular value."""
-        name = self.fully_qualify_name(name)
-        if not name in self._metrics:
+        key, name = self.key_and_fqn(name, tags)
+        if key not in self._metrics:
             gauge_metric = GaugeMetric(self.connection,
                                        name,
-                                       sample_rate)
-            self._metrics[name] = gauge_metric
-        self._metrics[name].mark(value)
+                                       sample_rate,
+                                       tags)
+            self._metrics[key] = gauge_metric
+        self._metrics[key].mark(value)
 
-    def meter(self, name, value=1, sample_rate=1):
+    def meter(self, name, value=1, sample_rate=1, tags=None):
         """Mark the occurrence of a given number of events."""
-        name = self.fully_qualify_name(name)
-        if not name in self._metrics:
+        key, name = self.key_and_fqn(name, tags)
+        if key not in self._metrics:
             meter_metric = MeterMetric(self.connection,
                                        name,
-                                       sample_rate)
-            self._metrics[name] = meter_metric
-        self._metrics[name].mark(value)
+                                       sample_rate,
+                                       tags)
+            self._metrics[key] = meter_metric
+        self._metrics[key].mark(value)
 
-    def increment(self, name, value=1, sample_rate=1):
+    def increment(self, name, value=1, sample_rate=1, tags=None):
         """Report and increase in name by count."""
-        name = self.fully_qualify_name(name)
-        if not name in self._metrics:
+        key, name = self.key_and_fqn(name, tags)
+        if key not in self._metrics:
             metric = Metric(self.connection,
                             name,
-                            sample_rate)
-            self._metrics[name] = metric
-        self._metrics[name].send("%s|c" % value)
+                            sample_rate,
+                            tags)
+            self._metrics[key] = metric
+        self._metrics[key].send("%s|c" % value)
 
-    def decrement(self, name, value=1, sample_rate=1):
+    def decrement(self, name, value=1, sample_rate=1, tags=None):
         """Report and decrease in name by count."""
-        name = self.fully_qualify_name(name)
-        if not name in self._metrics:
+        key, name = self.key_and_fqn(name, tags)
+        if key not in self._metrics:
             metric = Metric(self.connection,
                             name,
-                            sample_rate)
-            self._metrics[name] = metric
-        self._metrics[name].send("%s|c" % -value)
+                            sample_rate,
+                            tags)
+            self._metrics[key] = metric
+        self._metrics[key].send("%s|c" % -value)
 
     def reset_timing(self):
         """Resets the duration timer for the next call to timing()"""
@@ -135,34 +140,41 @@ class Metrics(object):
         self.last_time = current_time
         return duration
 
-    def timing(self, name, duration=None, sample_rate=1):
+    def timing(self, name, duration=None, sample_rate=1, tags=None):
         """Report that this sample performed in duration seconds.
            Default duration is the actual elapsed time since
            the last call to this method or reset_timing()"""
         if duration is None:
             duration = self.calculate_duration()
-        name = self.fully_qualify_name(name)
-        if not name in self._metrics:
+        key, name = self.key_and_fqn(name, tags)
+        if key not in self._metrics:
             metric = Metric(self.connection,
                             name,
-                            sample_rate)
-            self._metrics[name] = metric
-        self._metrics[name].send("%s|ms" % (duration * 1000))
+                            sample_rate,
+                            tags)
+            self._metrics[key] = metric
+        self._metrics[key].send("%s|ms" % (duration * 1000))
 
-    def distinct(self, name, item):
-        name = self.fully_qualify_name(name)
-        if not name in self._metrics:
-            metric = DistinctMetric(self.connection, name)
-            self._metrics[name] = metric
-        self._metrics[name].mark(item)
+    def distinct(self, name, item, tags=None):
+        key, name = self.key_and_fqn(name, tags)
+        if key not in self._metrics:
+            metric = DistinctMetric(self.connection, name, tags)
+            self._metrics[key] = metric
+        self._metrics[key].mark(item)
 
-    def clear(self, name):
+    def clear(self, name, tags=None):
         """Allow the metric to re-initialize its internal state."""
-        name = self.fully_qualify_name(name)
-        if name in self._metrics:
-            metric = self._metrics[name]
+        key, _ = self.key_and_fqn(name, tags)
+        if key in self._metrics:
+            metric = self._metrics[key]
             if getattr(metric, 'clear', None) is not None:
                 metric.clear()
+
+    def key_and_fqn(self, name, tags):
+        """Return the cache key and fully-qualified name."""
+        name = self.fully_qualify_name(name)
+        key = name, tuple(sorted(tags)) if tags else None
+        return key, name
 
     def fully_qualify_name(self, name):
         """Compose the fully-qualified name: namespace and name."""
