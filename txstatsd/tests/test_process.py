@@ -181,7 +181,8 @@ class TestSystemPerformance(TestCase):
         the number of threads will not be included in the output.
         """
         process = psutil.Process(os.getpid())
-        vsize, rss = process.memory_info()
+        (vsize, rss, _shared, _text,
+         _lib, _data, _dirty) = process.memory_info()
         cpu_percent = process.cpu_percent()
         memory_percent = process.memory_percent()
 
@@ -202,7 +203,8 @@ class TestSystemPerformance(TestCase):
         Process cpu counters are collected through psutil.
         """
         process = psutil.Process(os.getpid())
-        utime, stime = process.cpu_times()
+        print(process.cpu_times())
+        (utime, stime, _c_user, _c_system, _iow) = process.cpu_times()
 
         proc = mock.Mock()
         proc.cpu_times.return_value = (utime, stime)
@@ -220,7 +222,8 @@ class TestSystemPerformance(TestCase):
 
         """
         process = psutil.Process(os.getpid())
-        vsize, rss = process.memory_info()
+        (vsize, rss, _shared, _text,
+         _lib, _data, _dirty) = process.memory_info()
         cpu_percent = process.cpu_percent()
         memory_percent = process.memory_percent()
 
@@ -373,5 +376,3 @@ class TestSystemPerformance(TestCase):
         self.assertEqual({"foo": 4}, wrapped())
         self.assertEqual({"foo": 5}, wrapped())
         self.assertEqual({"foo": 7}, wrapped())
-
-
