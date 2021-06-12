@@ -32,7 +32,7 @@ class TimerMetric(Metric):
     statistics, plus throughput statistics via L{MeterMetric}.
     """
 
-    def __init__(self, connection, name, sample_rate=1):
+    def __init__(self, connection, name, sample_rate=1, tags=None):
         """Construct a metric that reports samples to the supplied
         C{connection}.
 
@@ -42,7 +42,8 @@ class TimerMetric(Metric):
         @param sample_rate: Restrict the number of samples sent
             to the StatsD server based on the supplied C{sample_rate}.
         """
-        Metric.__init__(self, connection, name, sample_rate=sample_rate)
+        Metric.__init__(self, connection, name, sample_rate=sample_rate,
+                        tags=tags)
 
     def mark(self, duration):
         """Report this sample performed in duration (measured in seconds)."""

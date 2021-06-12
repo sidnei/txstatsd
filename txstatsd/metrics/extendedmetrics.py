@@ -40,35 +40,38 @@ class ExtendedMetrics(Metrics):
 
         super(ExtendedMetrics, self).__init__(connection, namespace)
 
-    def increment(self, name, value=1, sample_rate=1):
+    def increment(self, name, value=1, sample_rate=1, tags=None):
         """Report and increase in name by count."""
-        name = self.fully_qualify_name(name)
-        if not name in self._metrics:
+        key, name = self.key_and_fqn(name, tags)
+        if key not in self._metrics:
             metric = CounterMetric(self.connection,
                                    name,
-                                   sample_rate)
-            self._metrics[name] = metric
-        self._metrics[name].increment(value)
+                                   sample_rate,
+                                   tags)
+            self._metrics[key] = metric
+        self._metrics[key].increment(value)
 
-    def decrement(self, name, value=1, sample_rate=1):
+    def decrement(self, name, value=1, sample_rate=1, tags=None):
         """Report and decrease in name by count."""
-        name = self.fully_qualify_name(name)
-        if not name in self._metrics:
+        key, name = self.key_and_fqn(name, tags)
+        if key not in self._metrics:
             metric = CounterMetric(self.connection,
                                    name,
-                                   sample_rate)
-            self._metrics[name] = metric
-        self._metrics[name].decrement(value)
+                                   sample_rate,
+                                   tags)
+            self._metrics[key] = metric
+        self._metrics[key].decrement(value)
 
-    def timing(self, name, duration=None, sample_rate=1):
+    def timing(self, name, duration=None, sample_rate=1, tags=None):
         """Report this sample performed in duration seconds."""
         if duration is None:
             duration = self.calculate_duration()
-        name = self.fully_qualify_name(name)
-        if not name in self._metrics:
+        key, name = self.key_and_fqn(name, tags)
+        if key not in self._metrics:
             metric = TimerMetric(self.connection,
                                  name,
-                                 sample_rate)
-            self._metrics[name] = metric
-        self._metrics[name].mark(duration)
+                                 sample_rate,
+                                 tags)
+            self._metrics[key] = metric
+        self._metrics[key].mark(duration)
 

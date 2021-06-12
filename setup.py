@@ -53,7 +53,7 @@ setup(
     author="txStatsD Developers",
     url="https://launchpad.net/txstatsd",
     license="MIT",
-    install_requires=['Twisted>=11.1.0,<=15.4.0'],
+    install_requires=['Twisted>=20.3.0'],
     packages=find_packages() + ["twisted.plugins"],
     scripts=glob("./bin/*"),
     long_description=long_description,

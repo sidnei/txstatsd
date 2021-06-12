@@ -54,6 +54,12 @@ class TestMetrics(TestCase):
         self.assertEqual(self.connection.data,
                          b'txstatsd.tests.gauge:102|g')
 
+    def test_gauge_with_tags(self):
+        """Test reporting of a gauge metric sample w/ tags."""
+        self.metrics.gauge('gauge', 102, tags=["foo:bar"])
+        self.assertEqual(self.connection.data,
+                         b'txstatsd.tests.gauge:102|g|#foo:bar')
+
     def test_meter(self):
         """Test reporting of a meter metric sample."""
         self.metrics.meter('meter', 3)
@@ -69,11 +75,28 @@ class TestMetrics(TestCase):
         self.assertEqual(self.connection.data,
                          b'txstatsd.tests.counter:-9|c')
 
+    def test_counter_with_tags(self):
+        """Test the increment and decrement operations w/ tags."""
+        self.metrics.increment('counter', 18, tags=["foo:bar"])
+        self.assertEqual(self.connection.data,
+                         b'txstatsd.tests.counter:18|c|#foo:bar')
+        self.metrics.decrement('counter', 9, tags=["foo:bar", "baz:quux"])
+        self.assertEqual(self.connection.data,
+                         b'txstatsd.tests.counter:-9|c|#foo:bar,baz:quux')
+
     def test_timing(self):
         """Test the timing operation."""
         self.metrics.timing('timing', 101.1234)
         # to support both 2 and 3, can't use assertRegex
         match = re.match(b'txstatsd.tests.timing:101123.4[0-9]*|ms', self.connection.data)
+        self.assertFalse(match is None)
+
+    def test_timing_with_tags(self):
+        """Test the timing operation w/ tags."""
+        self.metrics.timing('timing', 101.1234, tags=["foo:bar"])
+        # to support both 2 and 3, can't use assertRegex
+        match = re.match(b'txstatsd.tests.timing:101123.4[0-9]*|ms|#foo:bar',
+                         self.connection.data)
         self.assertFalse(match is None)
 
     def test_timing_automatic(self):
